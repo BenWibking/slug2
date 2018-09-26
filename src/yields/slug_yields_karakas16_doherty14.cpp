@@ -681,7 +681,7 @@ read_doherty14_tables(const char *yield_dir) {
     // Is the first token of the form numberM? If so, this line
     // declares start of a new mass and metallicity block, so extract
     // that information; note that we treat Z = 0.02 as "solar"
-    if (tokens[0].back() == 'M') {
+    if (tokens[0][tokens[0].length()-1] == 'M') {
       
       // Get m and Z of this block
       double m_block

@@ -1,8 +1,9 @@
-# Machine-specific settings for generic gnu-linux
+# Machine-specific settings for NCI raijin with intel compilers
 
-# Default is g++ / gcc compiler
+# Set compilers
 MACH_CXX          = icpc
 MACH_CC		  = icc
+MACH_MPICXX       = mpic++
 
 # Flag needed to specify c++11 standard
 MACH_C11FLAG      = -std=c++11
@@ -12,9 +13,15 @@ MACH_CXXLIB       = -lstdc++
 
 # Optimization flags; note that we omit -Wall because
 # g++ issues a ton of warnings about boost when -Wall is enabled
-MACH_CXXOPTFLAGS  = -O2 -fp-model precise -ipo
-MACH_COPTFLAGS	  = $(MACH_CXXOPTFLAGS)
-MACH_LDOPTFLAGS   = -O2 -fp-model precise -ipo
+ifeq ($(MPI), ENABLE_MPI)
+     MACH_CXXOPTFLAGS  = -O2 -fp-model precise
+     MACH_COPTFLAGS    = $(MACH_CXXOPTFLAGS)
+     MACH_LDOPTFLAGS   = -O2 -fp-model precise
+else
+     MACH_CXXOPTFLAGS  = -O2 -fp-model precise -ipo
+     MACH_COPTFLAGS    = $(MACH_CXXOPTFLAGS)
+     MACH_LDOPTFLAGS   = -O2 -fp-model precise -ipo
+endif
 
 # Debug flags
 MACH_CXXDEBFLAGS  = -g

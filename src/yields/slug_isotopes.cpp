@@ -141,7 +141,8 @@ isotope_table::isotope_table(const char *data_dir,
   // Build maps that go from both symbols and (Z,A) pairs to isotope
   // data
   for (auto it = all_isotopes_.begin(); it != all_isotopes_.end(); ++it) {
-    string symbol = (*it)->symbol() + to_string((*it)->wgt());
+    string symbol = (*it)->symbol() + 
+      to_string((unsigned long long) (*it)->wgt());
     isotope_map_symbol[symbol] = *it;
     isotope_map_za[make_pair((*it)->num(), (*it)->wgt())] = *it;
   }
