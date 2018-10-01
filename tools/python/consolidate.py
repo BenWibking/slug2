@@ -100,8 +100,8 @@ for basename in runs:
         rinfo={}
         try:
             cldata = read_cluster(f, nofilterdata=True, read_info=rinfo) 
-	    if args.checkdata:
-	        if np.sum(cldata.target_mass == 0.0) > 0 or \
+            if args.checkdata:
+                if np.sum(cldata.target_mass == 0.0) > 0 or \
                    np.sum(cldata.time == 0.0) > 0 or \
                    np.sum(cldata.A_V == 0.0) > 0:
                     errstr = "data for "+f+" appears to be damaged"
