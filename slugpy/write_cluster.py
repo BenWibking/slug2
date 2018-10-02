@@ -670,10 +670,17 @@ def write_cluster(data, model_name, fmt):
 
             # Write number of filters and filter names as ASCII
             nf = len(data.filter_names)
-            fp.write(str(nf)+"\n")
-            for i in range(nf):
-                fp.write(data.filter_names[i] + " " + 
-                         data.filter_units[i] + "\n")
+            if sys.version_info < (3,):
+                fp.write(str(nf)+"\n")
+                for i in range(nf):
+                    fp.write(data.filter_names[i] + " " + 
+                             data.filter_units[i] + "\n")
+            else:
+                fp.write(bytes(str(nf)+"\n", "ascii"))
+                for i in range(nf):
+                    fp.write(bytes(
+                        data.filter_names[i] + " " + 
+                        data.filter_units[i] + "\n", "ascii"))
 
             # Write out bytes indicating nebular or no nebular, and
             # extinction or no extinction
@@ -1132,13 +1139,22 @@ def write_cluster(data, model_name, fmt):
             fp.write(np.uint64(data.isotope_name.size))
             for i in range(data.isotope_name.size):
                 tempstr = "{:<4s}".format(data.isotope_name[i])
-                fp.write(struct.pack('ccccII',
-                                     tempstr[0],
-                                     tempstr[1],
-                                     tempstr[2],
-                                     tempstr[3],
-                                     data.isotope_Z[i],
-                                     data.isotope_A[i]))
+                if sys.version_info < (3,):
+                    fp.write(struct.pack('ccccII',
+                                         tempstr[0],
+                                         tempstr[1],
+                                         tempstr[2],
+                                         tempstr[3],
+                                         data.isotope_Z[i],
+                                         data.isotope_A[i]))
+                else:
+                    fp.write(struct.pack('ccccII',
+                                         bytes(tempstr[0], "ascii"),
+                                         bytes(tempstr[1], "ascii"),
+                                         bytes(tempstr[2], "ascii"),
+                                         bytes(tempstr[3], "ascii"),
+                                         data.isotope_Z[i],
+                                         data.isotope_A[i]))
 
             # Break data into blocks of clusters with the same time
             # and trial number
