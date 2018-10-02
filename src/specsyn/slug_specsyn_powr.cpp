@@ -64,7 +64,7 @@ using namespace boost::filesystem;
 // stick this in its own namesapce rather than attaching it to the
 // class because std::sort requires that sorting functions be static.
 ////////////////////////////////////////////////////////////////////////
-namespace powr {
+namespace slug_powr {
   bool starsort(const slug_stardata& star1, 
 		const slug_stardata& star2) {
     if (star1.WR == star2.WR) {
@@ -473,7 +473,7 @@ get_spectrum_clean(vector<slug_stardata>& stars) const {
 
   // Sort stars so that WN's come first, then WC's, and within each
   // class things are sorted by Teff
-  sort(stars.begin(), stars.end(), powr::starsort);
+  sort(stars.begin(), stars.end(), slug_powr::starsort);
 
   // Compute surface areas of stars
   vector<double> surf_area(stars.size());
