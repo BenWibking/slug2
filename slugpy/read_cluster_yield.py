@@ -110,7 +110,7 @@ def read_cluster_yield(model_name, output_dir=None, fmt=None,
 
             # Parse this line
             data = entry.split()
-            cl_id = long(data[0])
+            cl_id = int(data[0])
             t = float(data[1])
             iso_name = data[2].title()
             iso_Z = int(data[3])
@@ -166,7 +166,7 @@ def read_cluster_yield(model_name, output_dir=None, fmt=None,
 
             # Parse this line
             data = entry.split()
-            cl_id = long(data[0])
+            cl_id = int(data[0])
             t = float(data[1])
             yldtmp.append(float(data[5]))
 

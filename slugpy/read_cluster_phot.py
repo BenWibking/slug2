@@ -258,7 +258,7 @@ def read_cluster_phot(model_name, output_dir=None, fmt=None,
                     continue
                 linesplit = line.split()
                 if not phot_only:
-                    cluster_id.append(long(linesplit[0]))
+                    cluster_id.append(int(linesplit[0]))
                     time.append(float(linesplit[1]))
                 if read_nebular is not True and read_extinct is not True:
                     if read_filters is None:
