@@ -176,6 +176,9 @@ slug_predefined::build_IMF(const string& imfname,
 inline const slug_tracks*
 slug_predefined::build_tracks(const string&trackname) {
   path p(trackname);
+  // This is a quick-fix to get sb99 working again; will do a more
+  // permanent patch later
+  p /= path("sb99");
   build_rng();
   return (slug_tracks *)
     new slug_tracks_sb99((track_dir / p).string().c_str(), ostreams);
