@@ -314,13 +314,25 @@ def read_cluster_cloudyparams(model_name, output_dir=None, fmt=None,
         time = fp[1].data.field('Time')
         hden = fp[1].data.field('Hden')
         r0 = fp[1].data.field('R0')
-        r1 = fp[1].data.field('R1')
+        try:
+            # Compatibility for some older outputs, which didn't write R1
+            r1 = fp[1].data.field('R1')
+        except KeyError:
+            r1 = None
         QH0 = fp[1].data.field('QH0')
         covFac = fp[1].data.field('covFac')
         U = fp[1].data.field('U')
-        U0 = fp[1].data.field('U0')
+        try:
+            # Compatibility for some older outputs, which didn't write U0
+            U0 = fp[1].data.field('U0')
+        except KeyError:
+            U0 = None
         Omega = fp[1].data.field('Omega')
-        zeta = fp[1].data.field('zeta')
+        try:
+            # Compatibility for some older outputs, which didn't write U0
+            zeta = fp[1].data.field('zeta')
+        except KeyError:
+            zeta = None
         try:
             hden_out = fp[1].data.field('Hden_out')
             hden_out_set = True
