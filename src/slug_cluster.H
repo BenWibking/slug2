@@ -130,6 +130,9 @@ public:
   double get_stellar_mass() const { return stellarMass; }
   double get_age() const { return curTime - formationTime; }
   double get_stellar_death_mass() const { return stellarDeathMass; }
+  double get_remnant_mass() const {
+    return stochRemnantMass + nonStochRemnantMass; }
+  double get_non_stoch_remnant_mass() const { return nonStochRemnantMass; }
 
   // Routines to report the number of type II SN events
   double get_sn() const { return tot_sn; }
