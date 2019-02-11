@@ -42,11 +42,13 @@ public:
   // initialize some default values that the child class can override
   slug_tracks_2d(slug_ostreams& ostreams_,
 		 double metallicity_ = tracks::null_metallicity,
-		 ZInterpMethod Z_int_meth_ = Z_UNSPECIFIED) :
+		 ZInterpMethod Z_int_meth_ = Z_UNSPECIFIED,
+		 bool force_mcur_monotonic_ = false) :
     slug_tracks(ostreams_),
     interp(nullptr),
     metallicity(metallicity_),
     monotonic(false),
+    force_mcur_monotonic(force_mcur_monotonic_),
     Z_int_meth(Z_int_meth_),
     isochrone_age(-1.0)
   { }
@@ -172,6 +174,12 @@ protected:
 
   // Flag if tracks are monotonic
   bool monotonic;
+
+  // Flag if we are going to use an interpolation scheme that
+  // guarantees that the current stellar mass is monotonically
+  // decreasing for all stars; this is in general not guaranteed for
+  // higher-order and more accurate interpolation methods
+  const bool force_mcur_monotonic;
 
   // File names and metallicities, and interpolation method, for track
   // sets

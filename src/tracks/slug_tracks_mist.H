@@ -39,14 +39,16 @@ class slug_tracks_mist : public slug_tracks_2d {
 public:
 
   // Construct a set of tracks from a specified file name
-  slug_tracks_mist(const char *fname, slug_ostreams& ostreams_);
+  slug_tracks_mist(const char *fname, slug_ostreams& ostreams_,
+		   const bool force_mcur_monotonic_ = false);
 
   // Construct a set of tracks from a specified track set
   slug_tracks_mist(const trackSet tr_set,
 		   const double metallicity_,
 		   const char *track_dir,
 		   slug_ostreams& ostreams_,
-		   const ZInterpMethod Z_int_meth_ = Z_STEFFEN);
+		   const ZInterpMethod Z_int_meth_ = Z_STEFFEN,
+		   const bool force_mcur_monotonic_= false);
 
   // Destructor
   virtual ~slug_tracks_mist() { };

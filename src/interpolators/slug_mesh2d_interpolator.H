@@ -14,136 +14,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *********************************************************************/
 
-////////////////////////////////////////////////////////////////////////
-//
-// The classes in this module solves a generic mathematical
-// problem. We have a function whose value is specified at a set of
-// data points that lie on a semi-regular grid of the form
-//
-// (x_{ij}, y_j), i = 0 ... N-1, j = 0 ... M-1
-//
-// The points are non-decreasing, so x_{i,j} <= x_{i+1,j} and y_j <=
-// y_{j+1}, but need not be strictly increasing. There also need not
-// be any particular ordering of x_{i,j} and x_{i,j+1}, which implies
-// that the outer edge of the mesh need not be convex, and that edges
-// can be degenerate, i.e., (x_{ij}, y_j) = (x_{i+1,j}, y_j) =
-// (x_{i,j+1}, y_{j+1}), so the ij - i+1,j and ij - i,j+1 edges are
-// identical.
-//
-// Given a set of function values f_{ij} defined at the grid points,
-// we wish to define an interpolating function f(x,y) that will give
-// us the value of f at any point in the interior of the semi-regular
-// grid. We wish to extract this in two forms. First, we want to be
-// able to specify a value (x,y) that lies in the interior of the grid
-// and get back a value of f. Second, we want to be able to specify a
-// value x and get back a function f_x(y) that interpolates in the y
-// direction at fixed x, or specify a value of y and get back a
-// function f_y(x) that interpolates as fixed y.
-//
-// In the context of stellar evolution, the grid consists of a set of
-// evolutionary tracks. Each track is defined by an initial mass y_j =
-// log m_j, and by a series of evolutionary points, each characterized
-// by a time x_ij = log t_ij. The times t_ij are not the same for
-// different initial masses, so in general x_{ij} != x_{i+1,j}. For
-// each point in the evolutionary tracks, we have one or more stellar
-// properties f_{ij}, and we want to be able to interpolate these
-// properties, either by specifying a mass and an age directly, or by
-// specifying an age and getting back an isochrone -- a function that
-// returns stellar properties as a function of mass at fixed age.
-//
-// To solve this problem, we note that the points (x_ij, y_j) define a
-// series of quadrilaterals in the (x, y) plane. These quadrilaterals
-// have parallel edges in the x direction, but non-parallel edges in
-// the y direction. Graphically, the structure is something like this:
-//
-//  (x_{i,j+1}, y_{j+1})   (x_{i+1}, y_{i+1,j+1})
-//          o----------------------o
-//         /                        \
-//        /                          \
-//       /                            \
-//      o------------------------------o
-//  (x_{ij}, y_j)              (x_{i+1,j}, y_j})
-//
-// For convenience we will refer to the edges at constant y as
-// horizontal edges, and the edges that are not at constant y as
-// vertical edges, though they in fact are generally not perfectly
-// vertical. Let index (i,j) refer to the vertical edge that lies
-// above point (x_{ij}, y_j). The slope of this edge is
-//
-// m_{ij} = (y_{j+1} - y_j) / (x_{i,j+1} - x_{ij}).
-//
-// We can also define a distance coordinate along the vertical cell
-// edges. We define the distances to the grid points along the
-// vertical cell edges recursively by
-//
-// s_{i0} = 0
-// s_{i,j+1} = s_{i,j} + sqrt[ (x_{i,j+1} - x_{ij})^2 +
-//                             (y_{j+1} - y_j)^2 ].
-//
-// This can be generalized naturally to give a coordinate s for an
-// arbitrary point (x, y) that lies on one of the vertical edges:
-//
-// s(x,y) = s_{i,jmax} + sqrt[ (x - x_{i,jmax})^2 +
-//                             (y - y_{jmax})^2 ]
-//
-// where jmax = max(j) s.t. y > y_j and the condition that (x, y) be
-// on the vertical cell edge is equivalent to requiring that
-//
-// y - y_{jmax} = m_{i,jmax} (x - x_{i,jmax})
-//
-// for some i.
-//
-// Next, we define spline fits along both the horizontal and vertical
-// edges. Specifically, consider the set of points along a horizontal
-// edge
-//
-// p_j = (x_{0j}, f_{0j}), (x_{1,j}, f_{1,j}), ...
-//       (x_{N-1,j}, f_{N-1,j})
-//
-// These points p_j can be used to define a spline function P_j(x)
-// that accepts as an argument any x in [ x_{0j}, x_{N-1,j} ], and
-// returns a function value at x. We refer to this spline as a "spine"
-// along the x direction. The order and form of the spline is
-// arbitrary, but we will use a true spline, i.e., one that is
-// constrained to go through each data point, rather than a basis
-// spline.
-//
-// We can similarly define the set of points in along the vertical
-// edges
-//
-// q_i = (s_{i0}, f_{i0}), (s_{i1}, f_{i1}), ...
-//       (s_{i,M-1}, f_{i,M-1})
-//
-// and their corresponding "spine" spline functions Q_i(s(y)), where
-//
-// s(y) = s(x(y), y)
-// x(y) = x_{i,jmax} + (y - y_{jmax}) / m_{i,jmax}
-//
-// With these definitions in place, we can now define the procedures
-// for interpolating to a single point or alone a line of fixed
-// x. First consider generating an interpolating function along a line
-// of fixed x. We find all locations where a line of fixed x
-// intersects the mesh; these locations can be alone either horizontal
-// or vertical mesh edges. Let y_k be the set of intersection points,
-// ordered so that y_{k+1} > y_k. For each intersection point, we
-// define a corresponding interpolated function value f_k by
-// evaluating either P(x) (if the point corresponds to intersecting a
-// horizontal cell edge) or Q(s(y)) (if it corresponds to intersecting
-// a vertical cell edge). Given the set (y_k, f_k), we can define a
-// new interpolating function F(y) that allows us to evaluate the
-// function at any y.
-//
-// The case of interpolating to a single point is analogous, except
-// that we need not find all the intersection points y_k. We just find
-// as many as needed on each side to have enough for the type of
-// interpolating function we wish to use.
-//
-// Finally, the case of creating a function that interpolates in x at
-// fixed y is the same as well, except that the intersection points
-// are all vertical.
-//
-////////////////////////////////////////////////////////////////////////
-
 #ifndef _slug_mesh2d_interpolator_H_
 #define _slug_mesh2d_interpolator_H_
 
@@ -157,7 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // class slug_mesh2d_interpolator
 //
 // This class performs interpolation of scalar-valued functions on
-// semi-regular meshes, as described above.
+// semi-regular meshes. See the header to slug_mesh2d_grid.H for an
+// explanation of the underlying geometry and logic for this class.
 ////////////////////////////////////////////////////////////////////////
 
 enum mesh2d_edge_type { mesh2d_xlo, mesh2d_xhi, mesh2d_ylo,
@@ -169,11 +40,18 @@ public:
   
   // Constructor; needs arrays of x, y, and f points; an internal copy
   // of these data is made, so they can be modified or discarded after
-  // construction.
+  // construction. The option monotonicity-preserving tells the
+  // interpolator to set up its coordinate system so that it is
+  // possible to preserve monotonicity properties of the underlying
+  // data. Monotonicity in a particular variable can be guaranteed
+  // only if monotonicity-preserving is true AND the interpolation
+  // type is set to gsl_interp_linear; if either of these conditions
+  // is not met, monotonicity is not guaranteed
   slug_mesh2d_interpolator(const array2d& x, const array1d& y,
 			   const array2d& f_, 
 			   const gsl_interp_type *interp_type_ =
-			   slug_default_interpolator);
+			   slug_default_interpolator,
+			   const bool monotonicity_preserving = false);
 
   // Alternate constructor; completely identical except that it takes
   // views for x and f; this is to facilitate creating 2d meshes from
@@ -181,7 +59,8 @@ public:
   slug_mesh2d_interpolator(const view2d& x, const array1d& y,
 			   const view2d& f_, 
 			   const gsl_interp_type *interp_type_ =
-			   slug_default_interpolator);
+			   slug_default_interpolator,
+			   const bool monotonicity_preserving = false);
 
   // Destructor
   ~slug_mesh2d_interpolator();
@@ -261,6 +140,7 @@ private:
 
   // Interpolation machinery
   const gsl_interp_type *interp_type;
+  const bool monotonic_grid;
   const unsigned int interp_npt;
   mutable spl_arr_1d spl_x, spl_s;
   mutable acc_arr_1d acc_x, acc_s;
@@ -283,7 +163,8 @@ public:
 			       const array3d& f_, 
 			       const std::vector<const gsl_interp_type *>
 			       interp_type_ =
-			       std::vector<const gsl_interp_type *>());
+			       std::vector<const gsl_interp_type *>(),
+			       const bool monotonicity_preserving = false);
 
   // Destructor
   ~slug_mesh2d_interpolator_vec();
@@ -352,6 +233,7 @@ private:
 
   // Interpolation machinery
   const std::vector<const gsl_interp_type *> interp_type;
+  const bool monotonic_grid;
   mutable spl_arr_2d spl_x, spl_s;
   mutable acc_arr_2d acc_x, acc_s;
 };

@@ -363,6 +363,10 @@ get_isochrone(const double t, const vector<double> &m,
     if (pow(10.0, star.logM) > m[i]) {
       star.logM = log10(m[i]);
     }
+    //if (m[i] > 8.0)
+    //  cout << "i = " << i
+    //	   << ", m_init = " << m[i]
+    //	   << ", m_cur = " << exp(star.logM) << endl;
 
     // log g
     star.logg = constants::logG + star.logM +

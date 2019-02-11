@@ -61,8 +61,10 @@ namespace tracks {
 // tracks from a specified file name
 ////////////////////////////////////////////////////////////////////////
 slug_tracks_sb99::
-slug_tracks_sb99(const char *fname, slug_ostreams& ostreams_) :
-  slug_tracks_2d(ostreams_) {
+slug_tracks_sb99(const char *fname, slug_ostreams& ostreams_,
+		 const bool force_mcur_monotonic_) :
+  slug_tracks_2d(ostreams_, tracks::null_metallicity, Z_UNSPECIFIED,
+		 force_mcur_monotonic_) {
 
   // Read the file header to get the number of tracks and times it
   // contains, as well as the metallicity and minimum WR mass
@@ -87,18 +89,20 @@ slug_tracks_sb99(const char *fname, slug_ostreams& ostreams_) :
   // Read the rest of the file
   read_trackfile_tracks(trackfile, logm, logt, trackdata, ntrack, ntime);
 
-  // Specify that we want linear interpolation for the current mass,
-  // and the default interpolation type for all other variables
+  // Set interpolation type; choice depends on if we want to force the
+  // current mass to decrease montonically
   vector<const gsl_interp_type *> interp_type(nprop);
   for (vector<int>::size_type i=0; i<nprop; i++) {
-    if (i == idx_log_cur_mass) interp_type[i] = gsl_interp_linear;
-    else interp_type[i] = slug_default_interpolator;
+    if (i == idx_log_cur_mass && force_mcur_monotonic)
+      interp_type[i] = gsl_interp_linear;
+    else
+      interp_type[i] = slug_default_interpolator;
   }
 
   // Build the interpolation class that will interpolate on the tracks
   interp = new
     slug_mesh2d_interpolator_vec(logt, logm, trackdata,
-				 interp_type);
+				 interp_type, force_mcur_monotonic);
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -110,8 +114,10 @@ slug_tracks_sb99(const trackSet tr_set,
 		 const double metallicity_,
 		 const char *track_dir,
 		 slug_ostreams& ostreams_,
-		 const ZInterpMethod Z_int_meth_) :
-  slug_tracks_2d(ostreams_, metallicity_, Z_int_meth_) {
+		 const ZInterpMethod Z_int_meth_,
+		 const bool force_mcur_monotonic_) :
+  slug_tracks_2d(ostreams_, metallicity_, Z_int_meth_,
+		 force_mcur_monotonic_) {
 
   // Make sure the interpolation method is one of the ones allowed for
   // starburst99; higher order methods are not allowed because these
@@ -205,12 +211,14 @@ slug_tracks_sb99(const trackSet tr_set,
     bailout(1);
   }
 
-  // Specify that we want linear interpolation for the current mass,
-  // and the default interpolation type for all other variables
+  // Set interpolation type; choice depends on if we want to force the
+  // current mass to decrease montonically
   vector<const gsl_interp_type *> interp_type(nprop);
   for (vector<int>::size_type i=0; i<nprop; i++) {
-    if (i == idx_log_cur_mass) interp_type[i] = gsl_interp_linear;
-    else interp_type[i] = slug_default_interpolator;
+    if (i == idx_log_cur_mass && force_mcur_monotonic)
+      interp_type[i] = gsl_interp_linear;
+    else
+      interp_type[i] = slug_default_interpolator;
   }
 
   // Find the track indices that bound the input metallicity
@@ -256,7 +264,7 @@ slug_tracks_sb99(const trackSet tr_set,
     // Build the interpolation class that will interpolate on the tracks
     interp = new
       slug_mesh2d_interpolator_vec(logt, logm, trackdata,
-				   interp_type);
+				   interp_type, force_mcur_monotonic);
 
   } else {
 
@@ -330,7 +338,7 @@ slug_tracks_sb99(const trackSet tr_set,
     // Build the interpolation class that will interpolate on the tracks
     interp = new
       slug_mesh2d_interpolator_vec(logt, logm, trackdata,
-				   interp_type);
+				   interp_type, force_mcur_monotonic);
 
   }
 }

@@ -42,11 +42,13 @@ using namespace boost::multi_array_types;
 slug_mesh2d_interpolator::
 slug_mesh2d_interpolator(const array2d& x, const array1d& y,
 			 const array2d& f_, 
-			 const gsl_interp_type *interp_type_) :
+			 const gsl_interp_type *interp_type_,
+			 const bool monotonicity_preserving) :
   grid(x, y),
   nx(x.shape()[0]),
   ny(x.shape()[1]),
   interp_type(interp_type_),
+  monotonic_grid(monotonicity_preserving),
   interp_npt(gsl_interp_type_min_size(interp_type_)) {
 
   // Allocate memory for the spine interpolation arrays; note that we
@@ -72,11 +74,13 @@ slug_mesh2d_interpolator(const array2d& x, const array1d& y,
 slug_mesh2d_interpolator::
 slug_mesh2d_interpolator(const view2d& x, const array1d& y,
 			 const view2d& f_, 
-			 const gsl_interp_type *interp_type_) :
+			 const gsl_interp_type *interp_type_,
+			 const bool monotonicity_preserving) :
   grid(x, y),
   nx(x.shape()[0]),
   ny(x.shape()[1]),
   interp_type(interp_type_),
+  monotonic_grid(monotonicity_preserving),
   interp_npt(gsl_interp_type_min_size(interp_type_)) {
 
   // Allocate memory for the spine interpolation arrays
@@ -166,7 +170,8 @@ init_interpolators(T& f_) {
       if (j > 0) {
 	if (grid.s_grid()[i][j-1] == grid.s_grid()[i][j]) continue;
       }
-      s_tmp[count] = grid.s_grid()[i][j];
+      if (!monotonic_grid) s_tmp[count] = grid.s_grid()[i][j];
+      else s_tmp[count] = grid.y_grid()[j];
       f_tmp[count] = f[i][j];
       count++;
     }
@@ -241,6 +246,9 @@ operator()(const double x, const double y,
       if (edge[i] == 0) {
         spl = spl_s[idx[i]];
         acc = acc_s[idx[i]];
+	if (monotonic_grid)
+	  pos[i] = int_y[i]; // If vertical position coordinate is y
+			     // instead of s
       } else {
         spl = spl_x[idx[i]];
         acc = acc_x[idx[i]];
@@ -307,7 +315,7 @@ operator()(const double pos, const mesh2d_edge_type edge) const {
     assert(y <= grid.y_max());
     
     // Get the s coordinate along this edge
-    size_type j = grid.j_index(y);
+    double s;
     size_type idx;
     double x;
     if (edge == mesh2d_xlo) {
@@ -317,9 +325,14 @@ operator()(const double pos, const mesh2d_edge_type edge) const {
       idx = nx-1;
       x = grid.x_max(y);
     }
-    double s = grid.s_grid()[idx][j] +
-      sqrt((x - grid.x_grid()[idx][j]) * (x - grid.x_grid()[idx][j]) +
-	   (y - grid.y_grid()[j]) * (y - grid.y_grid()[j]));
+    if (!monotonic_grid) {
+      size_type j = grid.j_index(y);
+      s = grid.s_grid()[idx][j] +
+	sqrt((x - grid.x_grid()[idx][j]) * (x - grid.x_grid()[idx][j]) +
+	     (y - grid.y_grid()[j]) * (y - grid.y_grid()[j]));
+    } else {
+      s = y;
+    }
     
     // Interpolate to point
     f = gsl_spline_eval(spl_s[idx], s, acc_s[idx]);
@@ -388,6 +401,9 @@ build_interp_const_x(const double x,
     if (edge[i] == 0) {
       spl = spl_s[idx[i]];
       acc = acc_s[idx[i]];
+      if (monotonic_grid)
+	pos[i] = y[i]; // If using y instead of s as vertical
+		       // coordinate
     } else {
       spl = spl_x[idx[i]];
       acc = acc_x[idx[i]];
@@ -465,8 +481,13 @@ build_interp_const_y(const double y,
   for (vector<double>::size_type i=0; i<pos.size(); i++) {
     int gsl_errstat;
     double f_eval;
-    gsl_errstat =
-      gsl_spline_eval_e(spl_s[idx[i]], pos[i], acc_s[idx[i]], &f_eval);
+    if (!monotonic_grid) {
+      gsl_errstat =
+	gsl_spline_eval_e(spl_s[idx[i]], pos[i], acc_s[idx[i]], &f_eval);
+    } else {
+      gsl_errstat =
+	gsl_spline_eval_e(spl_s[idx[i]], y, acc_s[idx[i]], &f_eval);
+    }
     f_tmp[i] = f_eval;
     if (gsl_errstat) {
       stringstream ss;
@@ -508,12 +529,14 @@ slug_mesh2d_interpolator_vec::
 slug_mesh2d_interpolator_vec(const array2d& x, const array1d& y,
 			     const array3d& f_, 
 			     const vector<const gsl_interp_type *>
-			     interp_type_) :
+			     interp_type_,
+			     const bool monotonicity_preserving) :
   grid(x, y),
   nx(f_.shape()[0]),
   ny(f_.shape()[1]),
   nf(f_.shape()[2]),
-  interp_type(interp_type_) {
+  interp_type(interp_type_),
+  monotonic_grid(monotonicity_preserving) {
 
   // Allocate memory for the spine interpolation arrays
   spl_x.resize(boost::extents[ny][nf]);
@@ -614,7 +637,10 @@ init_interpolators(T& f_) {
       if (j > 0) {
 	if (grid.s_grid()[i][j-1] == grid.s_grid()[i][j]) continue;
       }
-      s_tmp[count] = grid.s_grid()[i][j];
+      if (!monotonic_grid)
+	s_tmp[count] = grid.s_grid()[i][j];
+      else
+	s_tmp[count] = grid.y_grid()[j];
       count++;
     }
     for (size_type n=0; n<nf; n++) {
@@ -627,7 +653,7 @@ init_interpolators(T& f_) {
 	count++;
       }
       if (spl_s[i][n] == nullptr) {
-	// Set intorpolation type for this quantity
+	// Set interpolation type for this quantity
 	const gsl_interp_type *itype;
 	if (interp_type.size() == 0) itype = slug_default_interpolator;
 	else itype = interp_type[n];
@@ -717,11 +743,16 @@ operator()(const double x, const double y, array1d& f_interp,
       for (vector<double>::size_type i=0; i<pos.size(); i++) {
 	int gsl_errstat;
 	double f_eval;
-	if (edge[i] == 0)
-	  gsl_errstat =
-	    gsl_spline_eval_e(spl_s[idx[i]][n], pos[i], acc_s[idx[i]][n],
-			      &f_eval);
-	else
+	if (edge[i] == 0) {
+	  if (!monotonic_grid)
+	    gsl_errstat =
+	      gsl_spline_eval_e(spl_s[idx[i]][n], pos[i], acc_s[idx[i]][n],
+				&f_eval);
+	  else
+	    gsl_errstat =
+	      gsl_spline_eval_e(spl_s[idx[i]][n], y, acc_s[idx[i]][n],
+				&f_eval);
+	} else
 	  gsl_errstat =
 	    gsl_spline_eval_e(spl_x[idx[i]][n], pos[i], acc_x[idx[i]][n],
 			      &f_eval);
@@ -828,7 +859,10 @@ operator()(const double x, const double y, const size_type f_idx,
       gsl_interp_accel *acc;
       if (edge[i] == 0) {
 	spl = spl_s[idx[i]][f_idx];
-	acc = acc_s[idx[i]][f_idx];	
+	acc = acc_s[idx[i]][f_idx];
+	if (monotonic_grid)
+	  pos[i] = int_y[i]; // If using y instead of s as coordinate
+			     // along spines
       } else {
 	spl = spl_x[idx[i]][f_idx];
 	acc = acc_x[idx[i]][f_idx];
@@ -897,7 +931,6 @@ operator()(const double pos, const mesh2d_edge_type edge,
     assert(y <= grid.y_max());
     
     // Get the s coordinate along this edge
-    size_type j = grid.j_index(y);
     size_type idx;
     double x;
     if (edge == mesh2d_xlo) {
@@ -907,9 +940,15 @@ operator()(const double pos, const mesh2d_edge_type edge,
       idx = nx-1;
       x = grid.x_max(y);
     }
-    double s = grid.s_grid()[idx][j] +
-      sqrt((x - grid.x_grid()[idx][j]) * (x - grid.x_grid()[idx][j]) +
-	   (y - grid.y_grid()[j]) * (y - grid.y_grid()[j]));
+    double s;
+    if (!monotonic_grid) {
+      size_type j = grid.j_index(y);
+      s = grid.s_grid()[idx][j] +
+        sqrt((x - grid.x_grid()[idx][j]) * (x - grid.x_grid()[idx][j]) +
+	     (y - grid.y_grid()[j]) * (y - grid.y_grid()[j]));
+    } else {
+      s = y;
+    }
 
     // Interpolate to point
     for (size_type n=0; n<nf; n++)
@@ -961,7 +1000,6 @@ operator()(const double pos, const mesh2d_edge_type edge,
     assert(y <= grid.y_max());
     
     // Get the s coordinate along this edge
-    size_type j = grid.j_index(y);
     size_type idx;
     double x;
     if (edge == mesh2d_xlo) {
@@ -971,9 +1009,15 @@ operator()(const double pos, const mesh2d_edge_type edge,
       idx = nx-1;
       x = grid.x_max(y);
     }
-    double s = grid.s_grid()[idx][j] +
-      sqrt((x - grid.x_grid()[idx][j]) * (x - grid.x_grid()[idx][j]) +
-	   (y - grid.y_grid()[j]) * (y - grid.y_grid()[j]));
+    double s;
+    if (!monotonic_grid) {
+      size_type j = grid.j_index(y);
+      s = grid.s_grid()[idx][j] +
+	sqrt((x - grid.x_grid()[idx][j]) * (x - grid.x_grid()[idx][j]) +
+	     (y - grid.y_grid()[j]) * (y - grid.y_grid()[j]));
+    } else {
+      s = y;
+    }
 
     // Interpolate to point
     f_interp = gsl_spline_eval(spl_s[idx][f_idx], s, acc_s[idx][f_idx]);
@@ -1050,6 +1094,9 @@ build_interp_const_x(const double x,
       if (edge[i] == 0) {
         spl = spl_s[idx[i]][n];
         acc = acc_s[idx[i]][n];
+	if (monotonic_grid)
+	  pos[i] = y[i]; // If using y instead of s as coordinate
+			 // along spines
       } else {
         spl = spl_x[idx[i]][n];
         acc = acc_x[idx[i]][n];
@@ -1137,9 +1184,14 @@ build_interp_const_y(const double y,
     for (vector<double>::size_type i=0; i<pos.size(); i++) {
       int gsl_errstat;
       double f_eval;
-      gsl_errstat =
-	gsl_spline_eval_e(spl_s[idx[i]][n], pos[i], acc_s[idx[i]][n],
-			  &f_eval);
+      if (!monotonic_grid)
+	gsl_errstat =
+	  gsl_spline_eval_e(spl_s[idx[i]][n], pos[i], acc_s[idx[i]][n],
+			    &f_eval);
+      else
+	gsl_errstat =
+	  gsl_spline_eval_e(spl_s[idx[i]][n], y, acc_s[idx[i]][n],
+			    &f_eval);
       f_tmp[i] = f_eval;
       if (gsl_errstat) {
 	stringstream ss;

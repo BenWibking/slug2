@@ -67,8 +67,10 @@ const char* const slug_tracks_mist::fits_colnames[] =
 ////////////////////////////////////////////////////////////////////////
 
 slug_tracks_mist::
-slug_tracks_mist(const char *fname, slug_ostreams& ostreams_) :
-  slug_tracks_2d(ostreams_) {
+slug_tracks_mist(const char *fname, slug_ostreams& ostreams_,
+		 const bool force_mcur_monotonic_) :
+  slug_tracks_2d(ostreams_, tracks::null_metallicity, Z_UNSPECIFIED,
+		 force_mcur_monotonic_) {
 
   // Read metallicity information from file name
   const regex Z_pattern("feh_[pm][0-9].[0-9][0-9]");
@@ -105,12 +107,10 @@ slug_tracks_mist(const char *fname, slug_ostreams& ostreams_) :
   // Read data
   read_trackfile(fname, logt, trackdata);
 
-  // Specify that we want linear interpolation for the current mass
-  // and the phase, and the default interpolation type for all other
-  // variables
+  // Set interpolation type
   vector<const gsl_interp_type *> interp_type(nprop);
   for (vector<int>::size_type i=0; i<nprop; i++) {
-    if (i == idx_log_cur_mass || i == idx_phase)
+    if ((i == idx_log_cur_mass && force_mcur_monotonic) || i == idx_phase)
       interp_type[i] = gsl_interp_linear;
     else
       interp_type[i] = slug_default_interpolator;
@@ -119,7 +119,7 @@ slug_tracks_mist(const char *fname, slug_ostreams& ostreams_) :
   // Build the interpolation class that will interpolate on the tracks
   interp = new
     slug_mesh2d_interpolator_vec(logt, logm, trackdata,
-				 interp_type);
+				 interp_type, force_mcur_monotonic);
 
 }
 
@@ -132,15 +132,15 @@ slug_tracks_mist(const trackSet tr_set,
 		 const double metallicity_,
 		 const char *track_dir,
 		 slug_ostreams& ostreams_,
-		 const ZInterpMethod Z_int_meth_) :
-  slug_tracks_2d(ostreams_, metallicity_, Z_int_meth_) {
+		 const ZInterpMethod Z_int_meth_,
+		 const bool force_mcur_monotonic_) :
+  slug_tracks_2d(ostreams_, metallicity_, Z_int_meth_,
+		 force_mcur_monotonic_) {
 
-  // Specify that we want linear interpolation for the current mass
-  // and the phase, and the default interpolation type for all other
-  // variables
+  // Set interpolation type
   vector<const gsl_interp_type *> interp_type(nprop);
   for (vector<int>::size_type i=0; i<nprop; i++) {
-    if (i == idx_log_cur_mass || i == idx_phase)
+    if ((i == idx_log_cur_mass && force_mcur_monotonic) || i == idx_phase)
       interp_type[i] = gsl_interp_linear;
     else
       interp_type[i] = slug_default_interpolator;
@@ -384,7 +384,7 @@ slug_tracks_mist(const trackSet tr_set,
   // Build the interpolation class that will interpolate on the tracks
   interp = new
     slug_mesh2d_interpolator_vec(logt, logm, trackdata,
-				 interp_type);
+				 interp_type, force_mcur_monotonic);
 }
 
 ////////////////////////////////////////////////////////////////////////

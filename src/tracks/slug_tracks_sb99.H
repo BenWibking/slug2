@@ -34,14 +34,16 @@ class slug_tracks_sb99 : public slug_tracks_2d {
 public:
 
   // Construct a set of tracks from a single file
-  slug_tracks_sb99(const char *fname, slug_ostreams& ostreams_);
+  slug_tracks_sb99(const char *fname, slug_ostreams& ostreams_,
+		   const bool force_mcur_monotonic_ = false);
 
   // Construct a set of tracks from a specified track set
   slug_tracks_sb99(const trackSet tr_set,
 		   const double metallicity_,
 		   const char *track_dir,
 		   slug_ostreams& ostreams_,
-		   const ZInterpMethod Z_int_meth_ = Z_LINEAR);
+		   const ZInterpMethod Z_int_meth_ = Z_LINEAR,
+		   const bool force_mcur_monotonic_ = false);
 
   // Destructor
   virtual ~slug_tracks_sb99() { };

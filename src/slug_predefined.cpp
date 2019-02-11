@@ -181,7 +181,8 @@ slug_predefined::build_tracks(const string&trackname) {
   p = path("sb99") / p;
   build_rng();
   return (slug_tracks *)
-    new slug_tracks_sb99((track_dir / p).string().c_str(), ostreams);
+    new slug_tracks_sb99((track_dir / p).string().c_str(), ostreams,
+			 true);
 }
 
 inline const slug_filter_set*

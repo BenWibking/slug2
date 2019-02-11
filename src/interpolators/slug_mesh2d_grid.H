@@ -73,7 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // m_{ij} = (y_{j+1} - y_j) / (x_{i,j+1} - x_{ij}).
 //
 // We can also define a distance coordinate along the vertical cell
-// edges. We define the distances to the grid points along the
+// edges. There are two possible ways to parmaeterize the coordinates
+// in this direction. One is just by the y coordinate, but another
+// choice is to define the distances to the grid points along the
 // vertical cell edges recursively by
 //
 // s_{i0} = 0
@@ -109,7 +111,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // spline.
 //
 // We can similarly define the set of points in along the vertical
-// edges
+// edges. If we use the variable s defined above as our coordinate
+// along the spines, this is:
 //
 // q_i = (s_{i0}, f_{i0}), (s_{i1}, f_{i1}), ...
 //       (s_{i,M-1}, f_{i,M-1})
@@ -118,6 +121,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 // s(y) = s(x(y), y)
 // x(y) = x_{i,jmax} + (y - y_{jmax}) / m_{i,jmax}
+//
+// Alternatively, if we use the y position as our coordinate across
+// the spines the results are the same, except that we simply set
+// s = y everywhere.
 //
 // With these definitions in place, we can now define the procedures
 // for interpolating to a single point or alone a line of fixed
@@ -132,6 +139,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // a vertical cell edge). Given the set (y_k, f_k), we can define a
 // new interpolating function F(y) that allows us to evaluate the
 // function at any y.
+//
+// Again, depending on our choice of coordinate along the spines, we
+// can also just set s = y in the above. The reason for using s = y
+// as an option is that this option, together with an overall linear
+// interpolation scheme, makes it possible to enforce strict
+// monotonicity, in the sense that if some quantity is monotonic in
+// x along all tracks, and we wish all interpolants to be similarly
+// monotonic, then we can guarantee that this will be so by setting
+// s = y and using linear interpolation. Any other choice does not
+// strictly guarantee monotonic behavior. However, the price of this
+// choice is an overall reduction in the level of accuracy in the
+// interpolation.
 //
 // The case of interpolating to a single point is analogous, except
 // that we need not find all the intersection points y_k. We just find
