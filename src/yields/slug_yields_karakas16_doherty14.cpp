@@ -173,9 +173,9 @@ init(const char *yield_dir,
 	vector<double>::iterator mass_it
 	  = find(mass_k16.begin(), mass_k16.end(), mass[j]);
 	vector<int>::size_type iso_idx
-	  = distance(isotopes_k16.begin(), isotope_it);
+	  = std::distance(isotopes_k16.begin(), isotope_it);
 	vector<int>::size_type mass_idx
-	  = distance(mass_k16.begin(), mass_it);
+	  = std::distance(mass_k16.begin(), mass_it);
 	yield_tab[i][j] = yield_tab_k16[iso_idx][mass_idx];
 	
       } else if (mass[j] > mass_k16.back()) {
@@ -188,9 +188,9 @@ init(const char *yield_dir,
 	vector<double>::iterator mass_it
 	  = find(mass_d14.begin(), mass_d14.end(), mass[j]);
 	vector<int>::size_type iso_idx
-	  = distance(isotopes_d14.begin(), isotope_it);
+	  = std::distance(isotopes_d14.begin(), isotope_it);
 	vector<int>::size_type mass_idx
-	  = distance(mass_d14.begin(), mass_it);
+	  = std::distance(mass_d14.begin(), mass_it);
 	yield_tab[i][j] = yield_tab_d14[iso_idx][mass_idx];
 
       } else {
@@ -208,7 +208,7 @@ init(const char *yield_dir,
 	  yld_k16 = -1.0;
 	} else {
 	  vector<double>::size_type iidx =
-	    distance(isotopes_k16.begin(), iso_it_k16);
+	    std::distance(isotopes_k16.begin(), iso_it_k16);
 	  vector<double>::size_type midx = 0;
 	  while (mass_k16[midx+1] <= mass[j]) {
 	    midx++;
@@ -230,7 +230,7 @@ init(const char *yield_dir,
 	  yld_d14 = -1.0;
 	} else {
 	  vector<double>::size_type iidx =
-	    distance(isotopes_d14.begin(), iso_it_d14);
+	    std::distance(isotopes_d14.begin(), iso_it_d14);
 	  vector<double>::size_type midx = 0;
 	  while (mass_d14[midx+1] <= mass[j]) {
 	    midx++;
