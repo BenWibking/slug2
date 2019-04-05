@@ -300,7 +300,7 @@ slug_tracks_mist(const trackSet tr_set,
     // data points, pad by replicating the final time to all further
     // points
     for (vector<double>::size_type i=0; i<nZ; i++) {
-      for (size_type j=ntime_Z[i]; j<ntime; j++) {
+      for (size_type j=ntime_Z[i]; j<ntime+1; j++) {
 	for (size_type k=0; k<ntrack; k++) {
 	  logt_Z[i][j][k] = logt_Z[i][ntime_Z[i]][k];
 	  for (size_type n=0; n<nprop; n++) {
