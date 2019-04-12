@@ -192,7 +192,7 @@ slug_parmParser::setDefaults() {
   keywords["rng_offset"] = 0;
   keywords["save_seed"] = false;
   keywords["read_seed"] = false;
-  keywords["rng_seed_file"] = "";
+  keywords["rng_seed_file"] = "slug_rng_seed.txt";
 
   // Output control parameters
   keywords["out_cluster"] = 1;
@@ -633,8 +633,7 @@ slug_parmParser::parseFile(std::ifstream &paramFile) {
     keywords["random_sfr"] = false;  
 
   // Initialise file paths from keywords
-  if (query<string>("rng_seed_file").length() > 0)
-    filepaths["rng_seed_file"] = path(query<string>("rng_seed_file"));
+  filepaths["rng_seed_file"] = path(query<string>("rng_seed_file"));
   filepaths["track_dir"] = path(query<string>("track_dir"));
   filepaths["filter_dir"] = path(query<string>("filters"));
   filepaths["yield_dir"] = path(query<string>("yield_dir"));

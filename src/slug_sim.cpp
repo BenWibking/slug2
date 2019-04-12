@@ -142,7 +142,7 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
 #endif
       if (pp.query<int>("save_seed")) {
 	std::ofstream seed_file;
-	string seed_file_name(pp.fpath("seed_file"));
+	string seed_file_name(pp.fpath("rng_seed_file"));
 	if (pp.query<int>("rng_offset") != 0) {
 	  stringstream ss;
 	  ss << seed_file_name << "_off_" << pp.query<int>("rng_offset");
