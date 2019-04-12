@@ -218,7 +218,7 @@ clf               lib/clf/nodisrupt.clf
 # -- padova_tpagb_yes (Padova models, added TP-AGB stars)
 # -- padova_tpagb_no (Padova models, no TP-AGB stars)
 # -- mist_2016_vvcrit_00 (MIST 2016 v1.0 models, non-rotating)
-# -- mist_2013_vvcrit_40 (MIST 2016 v1.0 models, rotating 40% breakup)
+# -- mist_2016_vvcrit_40 (MIST 2016 v1.0 models, rotating 40% breakup)
 # -- Any file name specifying a track file (generally lib/tracks/...)
 # Default: geneva_2013_vvcrit_00
 #tracks	  	  geneva_2013_vvcrit_00
