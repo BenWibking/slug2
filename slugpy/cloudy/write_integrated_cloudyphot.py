@@ -194,4 +194,4 @@ def write_integrated_cloudyphot(data, model_name, fmt):
         # Create HDU list and write to file
         hdulist = fits.HDUList([prihdu, tbhdu])
         hdulist.writeto(model_name+'_integrated_cloudyphot.fits',
-                        clobber=True)
+                        overwrite=True)

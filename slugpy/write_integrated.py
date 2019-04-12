@@ -296,7 +296,7 @@ def write_integrated(data, model_name, fmt):
             # Create HDU list and write to file
             hdulist = fits.HDUList([prihdu, tbhdu])
             hdulist.writeto(model_name+'_integrated_prop.fits',
-                            clobber=True)
+                            overwrite=True)
 
     ################################################################
     # Write the spectra file if we have the data for it
@@ -594,7 +594,7 @@ def write_integrated(data, model_name, fmt):
             # Create HDU list and write to file
             hdulist = fits.HDUList([prihdu, wlhdu, spechdu])
             hdulist.writeto(model_name+'_integrated_spec.fits', 
-                            clobber=True)
+                            overwrite=True)
                 
     ################################################################
     # Write photometry file if we have the data for it
@@ -825,7 +825,7 @@ def write_integrated(data, model_name, fmt):
             # Create HDU list and write to file
             hdulist = fits.HDUList([prihdu, tbhdu])
             hdulist.writeto(model_name+'_integrated_phot.fits',
-                            clobber=True)
+                            overwrite=True)
 
     ################################################################
     # Write the supernova file if we have the data for it
@@ -938,7 +938,7 @@ def write_integrated(data, model_name, fmt):
             prihdu = fits.PrimaryHDU()
             hdulist = fits.HDUList([prihdu, snhdu])
             hdulist.writeto(model_name+'_integrated_sn.fits',
-                            clobber=True)
+                            overwrite=True)
             
     ################################################################
     # Write yield file if we have the data for it
@@ -1095,7 +1095,7 @@ def write_integrated(data, model_name, fmt):
             prihdu = fits.PrimaryHDU()
             hdulist = fits.HDUList([prihdu, isohdu, yldhdu])
             hdulist.writeto(model_name+'_integrated_yield.fits',
-                            clobber=True)
+                            overwrite=True)
 
     ################################################################
     # Write cloudy files if we have the data for them

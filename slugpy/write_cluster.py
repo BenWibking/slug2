@@ -281,7 +281,7 @@ def write_cluster(data, model_name, fmt):
             # Create HDU list and write to file
             hdulist = fits.HDUList([prihdu, tbhdu])
             hdulist.writeto(model_name+'_cluster_prop.fits',
-                            clobber=True)
+                            overwrite=True)
 
 
     ################################################################
@@ -578,7 +578,7 @@ def write_cluster(data, model_name, fmt):
             # Create HDU list and write to file
             hdulist = fits.HDUList([prihdu, wlhdu, spechdu])
             hdulist.writeto(model_name+'_cluster_spec.fits', 
-                            clobber=True)
+                            overwrite=True)
 
     ################################################################
     # Write photometry file if we have the data for it
@@ -794,7 +794,7 @@ def write_cluster(data, model_name, fmt):
             # Create HDU list and write to file
             hdulist = fits.HDUList([prihdu, tbhdu])
             hdulist.writeto(model_name+'_cluster_phot.fits',
-                            clobber=True)
+                            overwrite=True)
 
         elif fmt == 'fits2':
 
@@ -871,7 +871,7 @@ def write_cluster(data, model_name, fmt):
             # Create final HDU list and write to file
             hdulist = fits.HDUList(hdulist)
             hdulist.writeto(model_name+'_cluster_phot.fits',
-                            clobber=True)
+                            overwrite=True)
 
 
     ################################################################
@@ -930,7 +930,7 @@ def write_cluster(data, model_name, fmt):
             # Create HDU list and write to file
             hdulist = fits.HDUList([prihdu, tbhdu])
             hdulist.writeto(model_name+'_cluster_ew.fits',
-                            clobber=True)
+                            overwrite=True)
 
         elif fmt == 'fits2':
 
@@ -976,7 +976,7 @@ def write_cluster(data, model_name, fmt):
             # Create final HDU list and write to file
             hdulist = fits.HDUList(hdulist)
             hdulist.writeto(model_name+'_cluster_ew.fits',
-                            clobber=True)
+                            overwrite=True)
 
 
     ################################################################
@@ -1082,7 +1082,7 @@ def write_cluster(data, model_name, fmt):
             # Create HDU list and write to file
             hdulist = fits.HDUList([prihdu, snhdu])
             hdulist.writeto(model_name+'_cluster_sn.fits', 
-                            clobber=True)
+                            overwrite=True)
             
             
     ################################################################
@@ -1227,7 +1227,7 @@ def write_cluster(data, model_name, fmt):
             # Create HDU list and write to file
             hdulist = fits.HDUList([prihdu, isohdu, yldhdu])
             hdulist.writeto(model_name+'_cluster_yield.fits', 
-                            clobber=True)
+                            overwrite=True)
 
 
     ################################################################

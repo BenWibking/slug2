@@ -186,4 +186,4 @@ def write_integrated_cloudyspec(data, model_name, fmt):
         # Create HDU list and write to file
         hdulist = fits.HDUList([prihdu, wlhdu, spechdu])
         hdulist.writeto(model_name+'_integrated_cloudyspec.fits', 
-                        clobber=True)
+                        overwrite=True)

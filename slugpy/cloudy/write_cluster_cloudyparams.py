@@ -240,5 +240,5 @@ def write_cluster_cloudyparams(data, model_name, fmt):
         # Create HDU list and write to file
         hdulist = fits.HDUList([prihdu, tbhdu])
         hdulist.writeto(model_name+'_cluster_cloudyparams.fits',
-                        clobber=True)
+                        overwrite=True)
 

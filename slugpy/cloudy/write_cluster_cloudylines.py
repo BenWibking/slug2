@@ -165,4 +165,4 @@ def write_cluster_cloudylines(data, model_name, fmt):
         # Create HDU list and write to file
         hdulist = fits.HDUList([prihdu, wlhdu, spechdu])
         hdulist.writeto(model_name+'_cluster_cloudylines.fits', 
-                        clobber=True)
+                        overwrite=True)

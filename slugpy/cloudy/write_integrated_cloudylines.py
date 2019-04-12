@@ -171,5 +171,5 @@ def write_integrated_cloudylines(data, model_name, fmt):
         # Create HDU list and write to file
         hdulist = fits.HDUList([prihdu, wlhdu, linelumhdu])
         hdulist.writeto(model_name+'_integrated_cloudylines.fits', 
-                        clobber=True)
+                        overwrite=True)
  
