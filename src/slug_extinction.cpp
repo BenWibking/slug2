@@ -96,7 +96,7 @@ slug_extinction(const slug_parmParser& pp,
   // Set up observed-frame nebular grid
   lambda_neb_obs = lambda_neb_grd;
   for (vector<double>::size_type i=0; i<lambda_neb_grd.size(); i++)
-    lambda_neb_obs[i] *= 1.0+pp.get_z();
+    lambda_neb_obs[i] *= 1.0+pp.query<double>("redshift");
 
   // Free GSL spline stuff
   gsl_spline_free(kappa_spline);
@@ -114,31 +114,33 @@ void slug_extinction::init(const slug_parmParser& pp,
 			   gsl_spline **kappa_spline,
 			   gsl_interp_accel **kappa_acc) {
   // Set up the A_V distribution
-  if (pp.get_constantAV()) {
+  if (pp.query<int>("constant_A_V")) {
     // Constant A_V, so make the A_V a delta distribution; note that
     // we do not need to delte the segment we great; it will be
     // de-allocated automatically when AVdist gets deleted
-    slug_PDF_delta *AV_seg = new slug_PDF_delta(pp.get_AV(), rng, ostreams);
+    slug_PDF_delta *AV_seg = new slug_PDF_delta(pp.query<double>("A_V"),
+						rng, ostreams);
     AVdist = new slug_PDF(AV_seg, rng, ostreams);
   } else {
     // Non-constant A_V, so read from PDF file
-    AVdist = new slug_PDF(pp.get_AV_dist(), rng, ostreams);
+    AVdist = new slug_PDF(pp.fpath("A_V"), rng, ostreams);
   }
 
   // See if we are using differential nebular / stellar extinction. If
   // so, set up the distribution for the ratio of nebular to continuum
   // extinction.
-  if (pp.get_use_neb_extinct()) {
+  if (pp.query<int>("use_nebular_extinction")) {
     // See if the excess extinction is a constant, and, if so, set it
     // up as a delta function
-    if (pp.get_constant_neb_extinct_fac()) {
+    if (pp.query<int>("constant_nebular_extinction_factor")) {
       slug_PDF_delta *delta_func
-	= new slug_PDF_delta(pp.get_neb_extinct_fac(), rng, ostreams);
+	= new slug_PDF_delta(pp.query<double>("nebular_extinction_factor"),
+			     rng, ostreams);
       neb_extinct_fac = new slug_PDF(delta_func, rng, ostreams);
     } else {
-    // Non-constant excess nebular A_V, so read from PDF file
-      neb_extinct_fac = new slug_PDF(pp.get_neb_extinct_fac_dist(), rng,
-				     ostreams);
+      // Non-constant excess nebular A_V, so read from PDF file
+      neb_extinct_fac = new slug_PDF(pp.fpath("nebular_extinction_factor"),
+				     rng, ostreams);
     }
   } else {
     neb_extinct_fac = nullptr;
@@ -146,12 +148,12 @@ void slug_extinction::init(const slug_parmParser& pp,
 
   // Try to open extinction curve file
   ifstream exfile;
-  exfile.open(pp.get_extinct_curve());
+  exfile.open(pp.fpath("extinction_curve"));
   if (!exfile.is_open()) {
     // Couldn't open file, so bail out
     ostreams.slug_err_one
       << "unable to open extinction curve file "
-      << pp.get_extinct_curve() << endl;
+      << pp.fpath("extinction_curve") << endl;
     bailout(1);
   }
   
@@ -172,7 +174,7 @@ void slug_extinction::init(const slug_parmParser& pp,
     // Extract data
     if (tokens.size() < 2) {
       ostreams.slug_err_one
-	<< "bad line in " << pp.get_extinct_curve()
+	<< "bad line in " << pp.fpath("extinction_curve")
 	<< ": " << line << endl;
       bailout(1);
     }
@@ -190,7 +192,8 @@ void slug_extinction::init(const slug_parmParser& pp,
   // Read the filter response function for the Johnson V filter; need
   // this so that we can normalize the extinction curve
   vector<string> filter_names = { "Johnson_V" };
-  slug_filter_set v_filter(filter_names, pp.get_filter_dir(), L_NU, ostreams);
+  slug_filter_set v_filter(filter_names, pp.fpath("filter_dir"),
+			   L_NU, ostreams);
   vector<double> filter_lambda = v_filter.get_filter(0)->get_wavelength();
   vector<double> filter_response = v_filter.get_filter(0)->get_response();
   vector<double> filter_nu;
@@ -238,7 +241,7 @@ void slug_extinction::init(const slug_parmParser& pp,
   // Set up observed-frame grid
   lambda_obs = lambda_grd;
   for (vector<double>::size_type i=0; i<lambda_grd.size(); i++)
-    lambda_obs[i] *= 1.0+pp.get_z();
+    lambda_obs[i] *= 1.0+pp.query<double>("redshift");
 }
 
 ////////////////////////////////////////////////////////////////////////

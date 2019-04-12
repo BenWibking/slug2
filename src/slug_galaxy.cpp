@@ -125,7 +125,7 @@ slug_galaxy::slug_galaxy(const slug_parmParser& pp,
   }
 
   // Get fc
-  fc = pp.get_fClust();
+  fc = pp.query<double>("clust_frac");
 
   // Initialize the cluster ID pointer
   cluster_id = 0;

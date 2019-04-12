@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
   pp.writeParams();
 
   // Run the requested type of simulation
-  if (pp.galaxy_sim())
+  if (pp.query<int>("sim_type") == galaxy_type)
     sim.galaxy_sim();
   else
     sim.cluster_sim();

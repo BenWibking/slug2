@@ -44,6 +44,8 @@ extern "C" {
 #   include "mpi.h"
 #endif
 
+enum simType { galaxy_type, cluster_type };
+
 class slug_sim {
 
 public:
@@ -105,6 +107,7 @@ private:
   slug_yields *yields;        // Class for calculating stellar yields
   slug_cluster *cluster;      // A single star cluster
   slug_galaxy *galaxy;        // A single galaxy
+  simType sim_type;           // Simulation type
   outputMode out_mode;        // Output mode
   int checkpoint_ctr;         // Checkpoint counter
   bool is_imf_var = false;          //Does the IMF contain variable segments?

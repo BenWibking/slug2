@@ -30,6 +30,7 @@ namespace std
 #include "constants.H"
 #include "slug_parmParser.H"
 #include "slug_IO.H"
+#include "tracks/slug_tracks.H"
 #ifdef ENABLE_FITS
 extern "C" {
 #include "fitsio.h"
@@ -158,97 +159,102 @@ slug_parmParser::printUsage() {
 
 
 ////////////////////////////////////////////////////////////////////////
-// Method to initialize all variables to default values
+// Method to initialize all keywords to default values; this also has
+// the important side effect of specifying which type each keyword is
+// supposed to have, information we will use to parse the parameter
+// file.
 ////////////////////////////////////////////////////////////////////////
 
 void
 slug_parmParser::setDefaults() {
 
+  // Checkpointing data
+  checkpoint_ctr = checkpoint_trials = 0;
+
   // Basic data
-  model = "SLUG_DEF";
-  outDir = "";
-  verbosity = 1;
-
-  // Control flow parameters
-  run_galaxy_sim = true;
-  nTrials = 1;
-  checkpointInterval = 0;
-  checkpointCtr = 0;
-  checkpointTrials = 0;
-  rng_offset = 0;
-  logTime = false;
-  outTimesList = false;
-  startTime = timeStep = endTime = -constants::big;
-  sfr = cluster_mass = -constants::big;
-  constantSFR = false;
-  constantAV = false;
-  randomSFR = false;
-  randomClusterMass = false;
-  randomOutputTime = false;
-  save_seed = read_seed = false;
-  use_extinct = false;
-  use_nebular = true;
-  use_neb_extinct = false;
-  lamers_loss = false;
-  neb_no_metals = false;
-
-  // Data paths
-  path lib_path("lib");
-  path imf_path("imf");
-  path imf_file("chabrier.imf");
-  imf = (lib_path / imf_path / imf_file).string();
-  path cmf_path("cmf");
-  path cmf_file("slug_default.cmf");
-  cmf = (lib_path / cmf_path / cmf_file).string();
-  path clf_path("clf");
-  path clf_file("slug_default.clf");
-  clf = (lib_path / clf_path / clf_file).string();
-  path track_path("tracks");
-  track_dir = (lib_path / track_path).string();
-  path atmos_path("atmospheres");
-  atmos_dir = (lib_path / atmos_path).string();
-  path extinct_path("extinct");
-  path extinct_file("SB_ATT_SLUG.dat");
-  extinct_curve = (lib_path / extinct_path / extinct_file).string();
-  path atomic_path("atomic");
-  atomic_dir = (lib_path / atomic_path).string();
-
-  // Values of numerical parameters
-  specsyn_mode = SB99;
-  track_set = GENEVA_2013_VVCRIT_00;
-  fClust = 1.0;
-  min_stoch_mass = 0.0;
-  metallicity = -constants::big;   // flag for not set
-  nebular_den = 1.0e2;
-  nebular_temp = -1.0;
-  nebular_phi = 0.73;
-  nebular_logU = -3.0;
-  lamers_t4 = 1.9e8;
-  lamers_gamma = 0.65;
-
-  // Photometric parameters
-  path filter_path("filters");
-  filter_dir = (lib_path / filter_path).string();
-  phot_mode = L_NU;
-
-  // Line parameters
-  path line_path("lines");
-  line_dir = (lib_path / line_path).string();
+  keywords["model_name"] = "SLUG_DEF";
+  keywords["out_dir"] = "";
+  keywords["verbosity"] = 1;
   
-  // Output parameters
-  z = 0.0;
-  writeClusterProp = writeClusterPhot = 
-    writeIntegratedProp = writeIntegratedPhot = 
-    writeClusterSpec = writeIntegratedSpec = writeClusterYield =
-    writeIntegratedYield = writeIntegratedSN = writeClusterSN = true;
-  writeClusterEW = false;
-  out_mode = ASCII;
+  // Control flow parameters
+  keywords["sim_type"] = galaxy_type;
+  keywords["n_trials"] = 1;
+  keywords["checkpoint_interval"] = 0;
+  keywords["log_time"] = false;
+  keywords["time_step"] = -constants::big;
+  keywords["start_time"] = -constants::big;
+  keywords["end_time"] = -constants::big;
+  keywords["output_times"] = vector<double>();
+  keywords["sfr"] = -constants::big;
+  keywords["sfh"] = "";
+  keywords["cluster_mass"] = -constants::big;
+  keywords["redshift"] = 0.0;
+  keywords["rng_offset"] = 0;
+  keywords["save_seed"] = false;
+  keywords["read_seed"] = false;
+  keywords["rng_seed_file"] = "";
 
-  // Yield parameters
-  path yield_path("yields");
-  yield_dir = (lib_path / yield_path).string();
-  yield_mode = SNII_SUKHBOLD16__AGB_KARAKAS16_DOHERTY14;
-  all_isotopes = no_decay = false;
+  // Output control parameters
+  keywords["out_cluster"] = 1;
+  keywords["out_cluster_phot"] = 1;
+  keywords["out_cluster_spec"] = 1;
+  keywords["out_cluster_sn"] = 1;
+  keywords["out_cluster_yield"] = 1;
+  keywords["out_cluster_ew"] = 0;
+  keywords["out_integrated"] = 1;
+  keywords["out_integrated_phot"] = 1;
+  keywords["out_integrated_spec"] = 1;
+  keywords["out_integrated_sn"] = 1;
+  keywords["out_integrated_yield"] = 1;
+  keywords["output_mode"] = ASCII;
+
+  // Stellar model parameters
+  path p = path("lib");
+  keywords["imf"] = (p / path("imf") / path("chabrier.imf")).string();
+  keywords["cmf"] = (p / path("cmf") / path("slug_default.cmf")).string();
+  keywords["clf"] = (p / path("clf") / path("slug_default.clf")).string();
+  keywords["track_set"] = GENEVA_2013_VVCRIT_00;
+  keywords["track_dir"] = (p / path("tracks")).string();
+  keywords["atmospheres"] = (p / path("atmospheres")).string();
+  keywords["specsyn_mode"] = SB99;
+  keywords["clust_frac"] = 1.0;
+  keywords["min_stoch_mass"] = 0.0;
+  keywords["metallicity"] = -constants::big;
+
+  // Extinction keywords
+  keywords["a_v"] = 0.0;
+  keywords["extinction_curve"] = (p / path("extinction") /
+				  path("SB_ATT_SLUG.dat")).string();
+  keywords["nebular_extinction_factor"] = 1.0;
+
+  // Nebular keywords
+  keywords["compute_nebular"] = 1;
+  keywords["atomic_data"] = (p / path("atomic")).string();
+  keywords["nebular_no_metals"] = 0;
+  keywords["nebular_den"] = 1.0e2;
+  keywords["nebular_temp"] = -1.0;
+  keywords["nebular_logU"] = -3.0;
+  keywords["nebular_phi"] = 0.73;
+
+  // Photometric filter keywords
+  keywords["phot_bands"] = vector<string>();
+  keywords["filters"] = (p / path("filters")).string();
+  keywords["phot_mode"] = L_NU;
+
+  // Yield keywords
+  keywords["yield_dir"] = (p / path("yields")).string();
+  keywords["yield_mode"] = SNII_SUKHBOLD16__AGB_KARAKAS16_DOHERTY14;
+  keywords["no_decay_isotopes"] = false;
+  keywords["isotopes_included"] = 0;
+
+  // Line keywords
+  keywords["line_dir"] = (p / path("lines")).string();
+  keywords["spectral_lines"] = vector<string>();
+
+  // Miscellaneous keywords
+  keywords["lamers_loss"] = 0;
+  keywords["lamers_t4"] = 1.9e8;
+  keywords["lamers_gamma"] = 0.65;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -267,7 +273,7 @@ slug_parmParser::parseFile(std::ifstream &paramFile) {
     trim(line);
 
     // If there is nothing left after trimming, or the first remaining
-    // character is #, then continue to next line
+    // character is # indicating a comment, then continue to next line
     if (line.length() == 0) continue;
     if (line.compare(0, 1 ,"#") == 0) continue;
 
@@ -281,409 +287,326 @@ slug_parmParser::parseFile(std::ifstream &paramFile) {
     // message and exit
     if (tokens.size() < 2) parseError(line);
 
-    // If we're here, line is in valid format, so read the value of
-    // the token and check it against known tokens to find the match
-    unsigned int nTokExpected = 2;
+    // If we're here, line is in valid format; check the keyword to
+    // make sure that it is known
     to_lower(tokens[0]);
+    map<const std::string, slug_parmParser_keyword>::iterator it =
+      keywords.find(tokens[0]);
+    if (it == keywords.end()) {
+      ostreams.slug_err_one << "unknown keyword "
+			    << tokens[0]
+			    << " on line: "
+			    << line << std::endl;
+      bailout(1);
+    }
+
+    // Parse keyword value depending on type; we also need to handle
+    // various special cases where keywords can have multiple types,
+    // or where the type of the input doesn't match the variable type
+    // we eventually want to store
+    unsigned int nTokExpected = 2;
     try {
 
-      // Basic parameters
-      if (!(tokens[0].compare("model_name"))) {
-	model = tokens[1];
-      } else if (!(tokens[0].compare("out_dir"))) {
-	outDir = tokens[1];
-      } else if (!(tokens[0].compare("verbosity"))) {
-	verbosity = lexical_cast<unsigned int>(tokens[1]);
-      }
-      
-      // Simulation control parameters
-      else if (!(tokens[0].compare("sim_type"))) {
+      // Special cases: these are keywords where the entry the user
+      // provides is not of the same "type" as the data, or where
+      // multiple "types" are acceptable in the parameter file
+      if (!(tokens[0].compare("sim_type"))) {
+
+	// Acceptable values are "cluster" or "galaxy"
 	to_lower(tokens[1]);
 	if (tokens[1].compare("cluster") == 0) {
-	  run_galaxy_sim = false;
-	  writeIntegratedProp = writeIntegratedSpec =
-	    writeIntegratedPhot = writeIntegratedYield =
-	    writeIntegratedSN = false;
+	  keywords["sim_type"] = cluster_type;
+	  keywords["out_integrated"]
+	    = keywords["out_integrated_phot"]
+	    = keywords["out_integrated_spec"]
+	    = keywords["out_integrated_phot"]
+	    = keywords["out_integrated_sn"] = false;
 	}
 	else if (tokens[1].compare("galaxy") == 0)
-	  run_galaxy_sim = true;
+	  keywords["sim_type"] = galaxy_type;
 	else {
 	  ostreams.slug_err_one << "unknown sim_type: " << line << std::endl;
 	  bailout(1);
 	}
-      } else if (!(tokens[0].compare("n_trials"))) {
-	nTrials = lexical_cast<unsigned int>(tokens[1]);
-      } else if (!(tokens[0].compare("checkpoint_interval"))) {
-	checkpointInterval = lexical_cast<unsigned int>(tokens[1]);
-      } else if (!(tokens[0].compare("log_time"))) {
-	logTime = (lexical_cast<double>(tokens[1]) == 1);
-      } else if (!(tokens[0].compare("time_step"))) {
-	// See if timeStep is a number, indicating definite output times
-	try {
-	  timeStep = lexical_cast<double>(tokens[1]);
-	} catch (const bad_lexical_cast& ia) {
-	  out_time_dist = tokens[1];
-	  randomOutputTime = true;
-	}
-      } else if (!(tokens[0].compare("start_time"))) {
-	startTime = lexical_cast<double>(tokens[1]);
-      } else if (!(tokens[0].compare("end_time"))) {
-	endTime = lexical_cast<double>(tokens[1]);
-      } else if (!(tokens[0].compare("output_times"))) {
-
-	// Flag that we have an output time list
-	outTimesList = true;
 	
-	// Count tokens
-	nTokExpected = 1;
+      } else if (!(tokens[0].compare("time_step"))) {
 
-	// For this key, we don't know in advance how many bands to
-	// expect, so parse them one at a time
-	for (unsigned int tokPtr = 1; tokPtr < tokens.size(); tokPtr++) {
-
-	  // Check if this is a comment; if so, stop iterating; if
-	  // not, increment the number of tokens expected
-	  if ((tokens[tokPtr]).compare(0, 1, "#") == 0) break;
-	  nTokExpected++;
-
-	  // This is not a comment; break up by commas
-	  vector<string> outTimesTmp;
-	  split(outTimesTmp, tokens[tokPtr], is_any_of(", "),
-		token_compress_on);
-
-	  // Push onto output times list
-	  for (unsigned int i = 0; i < outTimesTmp.size(); i++) {
-	    if (outTimesTmp[i].length() == 0) continue;
-	    outTimes.push_back(lexical_cast<double>(outTimesTmp[i]));
-	  }
+	// Acceptable values are a number of the name of a PDF file
+	try {
+	  keywords["time_step"] = lexical_cast<double>(tokens[1]);
+	} catch (const bad_lexical_cast& ia) {
+	  keywords["time_step"] = tokens[1];
+	  filepaths["output_time_dist"] = path(tokens[1]);
 	}
-      } else if (!(tokens[0].compare("sfr"))) {
-	string tmp = tokens[1];
-	to_lower(tmp);
-	if (tmp.compare("sfh") == 0)
-	  constantSFR = false;
-	else {
-	  try {
-	    // See if the SFR is a number, indicating a constant SFR
-	    sfr = lexical_cast<double>(tokens[1]);
-	    constantSFR = true;
-	  } catch (const bad_lexical_cast& ia) {
-	    // SFR is neither a number nor "sfh", so interpret this as
-	    // giving the name of a PDF file that will be used to draw
-	    // a SFR
-	    randomSFR = true;
-	    sfr_file = tokens[1];
-	  }
-	}
-      } else if (!(tokens[0].compare("sfh"))) {
-	sfh = tokens[1];
-      } else if (!(tokens[0].compare("cluster_mass"))) {
-	string tmp = tokens[1];
-	to_lower(tmp);
-	if (tmp.compare("cmf") == 0)
-	  randomClusterMass = true;
-	else
-	  cluster_mass = lexical_cast<double>(tokens[1]);
-      } else if (!(tokens[0].compare("redshift"))) {
-	z = lexical_cast<double>(tokens[1]);	
-      } else if (!(tokens[0].compare("lamers_evaporation"))) {
-	lamers_loss = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("lamers_t4"))) {
-	lamers_t4 = lexical_cast<double>(tokens[1]);
-      } else if (!(tokens[0].compare("lamers_gamma"))) {
-	lamers_gamma = lexical_cast<double>(tokens[1]);
-      }
-
-      // Random number generator control
-      else if (!(tokens[0].compare("rng_offset"))) {
-	rng_offset = lexical_cast<unsigned int>(tokens[1]);
-      } else if (!(tokens[0].compare("save_rng_seed"))) {
-	save_seed = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("read_rng_seed"))) {
-	read_seed = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("rng_seed_file"))) {
-	seed_file = tokens[1];
-      }
-      
-      // Equivalent widths
-      else if (!(tokens[0].compare("lines"))) {
-        line_dir = tokens[1];
-      }
-
-      // Output control keywords
-      else if (!(tokens[0].compare("out_cluster"))) {
-	writeClusterProp = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("out_cluster_ew"))) {
-        writeClusterEW = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("out_cluster_phot"))) {
-	writeClusterPhot = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("out_cluster_spec"))) {
-	writeClusterSpec = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("out_cluster_sn"))) {
-	writeClusterSN = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("out_cluster_yield"))) {
-	writeClusterYield = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("out_integrated"))) {
-	writeIntegratedProp = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("out_integrated_phot"))) {
-	writeIntegratedPhot = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("out_integrated_spec"))) {
-	writeIntegratedSpec = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("out_integrated_sn"))) {
-	writeIntegratedSN = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("out_integrated_yield"))) {
-	writeIntegratedYield = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("save_rng_seed"))) {
-	save_seed = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("read_rng_seed"))) {
-	read_seed = lexical_cast<int>(tokens[1]) != 0;
+	
       } else if (!(tokens[0].compare("output_mode"))) {
+
+	// Acceptable values are 'ascii', 'binary' or 'bin', or 'fits'
 	to_lower(tokens[1]);
 	if (tokens[1].compare("ascii") == 0)
-	  out_mode = ASCII;
-	else if (tokens[1].compare("binary") == 0)
-	  out_mode = BINARY;
+	  keywords["output_mode"] = ASCII;
+	else if (tokens[1].compare("binary") == 0 ||
+		 tokens[1].compare("bin") == 0)
+	  keywords["output_mode"] = BINARY;
 #ifdef ENABLE_FITS
 	else if (tokens[1].compare("fits") == 0)
-	  out_mode = FITS;
+	  keywords["output_mode"] = FITS;
 #endif
 	else {
 	  ostreams.slug_err_one << "unknown output_mode: "
 				<< line << std::endl;
 	  bailout(1);
-	}	
-      }
+	}
+	
+      } else if (!(tokens[0].compare("sfr"))) {
 
-      // Stellar model keywords
-      else if (!(tokens[0].compare("imf"))) {
-	imf = tokens[1];
-      } else if (!(tokens[0].compare("cmf"))) {
-	cmf = tokens[1];
-      } else if (!(tokens[0].compare("clf"))) {
-	clf = tokens[1];
+	// Acceptable values are a number, the string 'sfh', or the
+	// name of a PDF file
+	to_lower(tokens[1]);
+	if (tokens[1].compare("sfh") == 0) {
+	  keywords["constant_sfr"] = false;
+	  keywords["random_sfr"] = false;
+	  filepaths["sfh"] = path(tokens[1]);
+	} else {
+	  try {
+	    // See if the SFR is a number, indicating a constant SFR
+	    keywords["sfr"] = lexical_cast<double>(tokens[1]);
+	    keywords["constant_sfr"] = true;
+	    keywords["random_sfr"] = false;
+	  } catch (const bad_lexical_cast& ia) {
+	    // SFR is not a number or "sfh", so interpret it as the
+	    // name of a PDF file
+	    keywords["constant_sfr"] = false;
+	    keywords["random_sfr"] = true;
+	    filepaths["sfr"] = path(tokens[1]);
+	  }
+	}
+
+      } else if (!(tokens[0].compare("cluster_mass"))) {
+
+	// Acceptable values are the string 'cmf' or a numerical
+	// value
+	to_lower(tokens[1]);
+	if (tokens[1].compare("cmf") == 0) {
+	  keywords["cluster_mass"] = tokens[1];
+	  keywords["random_cluster_mass"] = true;
+	} else {
+	  keywords["cluster_mass"] = lexical_cast<double>(tokens[1]);
+	  keywords["random_cluster_mass"] = false;
+	}
+
       } else if (!(tokens[0].compare("tracks"))) {
-	// See if the user has specified one of the known track sets
+	
+	// User can specify either one of the known track sets, or can
+	// give the file name of a valid track file
 	string track_val = tokens[1];
 	to_lower(track_val);
 	if (!track_val.compare("geneva_2013_vvcrit_00")) {
-	  track_set = GENEVA_2013_VVCRIT_00;
+	  keywords["track_set"] = GENEVA_2013_VVCRIT_00;
 	} else if (!track_val.compare("geneva_2013_vvcrit_40")) {
-	  track_set = GENEVA_2013_VVCRIT_40;
+	  keywords["track_set"] = GENEVA_2013_VVCRIT_40;
 	} else if (!track_val.compare("geneva_mdot_std")) {
-	  track_set = GENEVA_MDOT_STD;
+	  keywords["track_set"] = GENEVA_MDOT_STD;
 	} else if (!track_val.compare("geneva_mdot_enhanced")) {
-	  track_set = GENEVA_MDOT_ENHANCED;
+	  keywords["track_set"] = GENEVA_MDOT_ENHANCED;
 	} else if (!track_val.compare("padova_tpagb_yes")) {
-	  track_set = PADOVA_TPAGB_YES;
+	  keywords["track_set"] = PADOVA_TPAGB_YES;
 	} else if (!track_val.compare("padova_tpagb_no")) {
-	  track_set = PADOVA_TPAGB_NO;
+	  keywords["track_set"] = PADOVA_TPAGB_NO;
 	} else if (!track_val.compare("mist_2016_vvcrit_00")) {
-	  track_set = MIST_2016_VVCRIT_00;
+	  keywords["track_set"] = MIST_2016_VVCRIT_00;
 	} else if (!track_val.compare("mist_2016_vvcrit_40")) {
-	  track_set = MIST_2016_VVCRIT_40;
+	  keywords["track_set"] = MIST_2016_VVCRIT_40;
 	} else {
 	  // Track is not a special value, so interpret as a file name
-	  track_set = NO_TRACK_SET;
-	  track = tokens[1];
+	  keywords["track_set"] = NO_TRACK_SET;
+	  filepaths["tracks"] = path(tokens[1]);
 	}
-      } else if (!(tokens[0].compare("track_dir"))) {
-	track_dir = tokens[1];
-      } else if (!(tokens[0].compare("atmospheres"))) {
-	atmos_dir = tokens[1];
+	
       } else if (!(tokens[0].compare("specsyn_mode"))) {
+
+	// Spectral synthesis mode, specified as one of several
+	// strings
 	to_lower(tokens[1]);
 	if (tokens[1].compare("planck") == 0)
-	  specsyn_mode = PLANCK;
+	  keywords["specsyn_mode"] = PLANCK;
 	else if (tokens[1].compare("kurucz") == 0)
-	  specsyn_mode = KURUCZ;
+	  keywords["specsyn_mode"] = KURUCZ;
 	else if (tokens[1].compare("kurucz+hillier") == 0)
-	  specsyn_mode = KURUCZ_HILLIER;
+	  keywords["specsyn_mode"] = KURUCZ_HILLIER;
 	else if (tokens[1].compare("kurucz+pauldrach") == 0)
-	  specsyn_mode = KURUCZ_PAULDRACH;
+	  keywords["specsyn_mode"] = KURUCZ_PAULDRACH;
 	else if (tokens[1].compare("sb99") == 0)
-	  specsyn_mode = SB99;
+	  keywords["specsyn_mode"] = SB99;
 	else if (tokens[1].compare("sb99hruv") == 0)
-	  specsyn_mode = SB99_HRUV;
+	  keywords["specsyn_mode"] = SB99_HRUV;
 	else {
-	  ostreams.slug_err_one << "unknown output_mode: "
+	  ostreams.slug_err_one << "unknown specsyn_mode: "
 				<< line << std::endl;
 	  bailout(1);
 	}
-      } else if (!(tokens[0].compare("clust_frac"))) {
-	fClust = lexical_cast<double>(tokens[1]);
-      } else if (!(tokens[0].compare("min_stoch_mass"))) {
-	min_stoch_mass = lexical_cast<double>(tokens[1]);
-      } else if (!(tokens[0].compare("metallicity"))) {
-	metallicity = lexical_cast<double>(tokens[1]);
-      }
 
-      // Extinction keywords
-      else if (!(tokens[0].compare("a_v"))) {
-	use_extinct = true;
-	try {
-	  // See if the A_V is a number, indicating a constant A_V
-	  A_V = lexical_cast<double>(tokens[1]);
-	  constantAV = true;
-	} catch (const bad_lexical_cast& ia) {
-	  // A_V is not a number, so assume it is a distribution file name
-	  AV_dist = tokens[1];
-	  constantAV = false;
-	}
-      } else if (!(tokens[0].compare("extinction_curve"))) {
-	extinct_curve = tokens[1];
-      } else if (!(tokens[0].compare("nebular_extinction_factor"))) {
-	use_neb_extinct = true;
-	try {
-	  // See if A_V,neb/A_V,star is a number
-	  neb_extinct_fac = lexical_cast<double>(tokens[1]);
-	  constant_neb_extinct_fac = true;
-	} catch (const bad_lexical_cast& ia) {
-	  // Not a number, so assume it is a distribution file name
-	  neb_extinct_fac_dist = tokens[1];
-	  constant_neb_extinct_fac = false;
-	}
-      }
-
-      // Nebular keywords
-      else if (!(tokens[0].compare("compute_nebular"))) {
-	use_nebular = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("atomic_data"))) {
-	atomic_dir = tokens[1];
-      } else if (!(tokens[0].compare("nebular_no_metals"))) {
-	neb_no_metals = lexical_cast<int>(tokens[1]) != 0;
-      } else if (!(tokens[0].compare("nebular_den"))) {
-	nebular_den = lexical_cast<double>(tokens[1]);
-      } else if (!(tokens[0].compare("nebular_temp"))) {
-	nebular_temp = lexical_cast<double>(tokens[1]);
-      } else if (!(tokens[0].compare("nebular_phi"))) {
-	nebular_phi = lexical_cast<double>(tokens[1]);
-      } else if (!(tokens[0].compare("nebular_logu"))) {
-	nebular_logU = lexical_cast<double>(tokens[1]);
-      }
-
-      // Photometry keywords
-      else if (!(tokens[0].compare("filters"))) {
-	filter_dir = tokens[1];
-      } else if (!(tokens[0].compare("phot_bands"))) {
-
-	// Count tokens
-	nTokExpected = 1;
-
-	// For this key, we don't know in advance how many bands to
-	// expect, so parse them one at a time
-	for (unsigned int tokPtr = 1; tokPtr < tokens.size(); tokPtr++) {
-
-	  // Check if this is a comment; if so, stop iterating; if
-	  // not, increment the number of tokens expected
-	  if ((tokens[tokPtr]).compare(0, 1, "#") == 0) break;
-	  nTokExpected++;
-
-	  // This is not a comment; break up by commas
-	  vector<string> photBandTmp;
-	  split(photBandTmp, tokens[tokPtr], is_any_of(", "),
-		token_compress_on);
-
-	  // Push onto photometric band list
-	  for (unsigned int i = 0; i < photBandTmp.size(); i++) {
-	    if (photBandTmp[i].length() == 0) continue;
-	    photBand.push_back(photBandTmp[i]);
-	  }
-	}
       } else if (!(tokens[0].compare("phot_mode"))) {
+
+	// Photometry mode: acceptable values are l_nu, l_lambda,
+	// ab, vega, and stmag
 	to_lower(tokens[1]);
 	if (tokens[1].compare("l_nu") == 0)
-	  phot_mode = L_NU;
+	  keywords["phot_mode"] = L_NU;
 	else if (tokens[1].compare("l_lambda") == 0)
-	  phot_mode = L_LAMBDA;
+	  keywords["phot_mode"] = L_LAMBDA;
 	else if (tokens[1].compare("ab") == 0)
-	  phot_mode = AB;
+	  keywords["phot_mode"] = AB;
 	else if (tokens[1].compare("stmag") == 0)
-	  phot_mode = STMAG;
+	  keywords["phot_mode"] = STMAG;
 	else if (tokens[1].compare("vega") == 0)
-	  phot_mode = VEGA;
+	  keywords["phot_mode"] = VEGA;
 	else {
 	  ostreams.slug_err_one << "unknown output_mode: "
 				<< line << std::endl;
 	  bailout(1);
 	}
-      }
+	
+      } else if (!(tokens[0].compare("a_v"))) {
 
-      // Yields keywords
-      else if (!(tokens[0].compare("yield_dir"))) {
-	yield_dir = tokens[1];
+	// Extinction can be specified as a number or a PDF file name
+	try {
+	  // See if the A_V is a number, indicating a constant A_V
+	  keywords["A_V"] = lexical_cast<double>(tokens[1]);
+	  keywords["constant_A_V"] = true;
+	  if (query<double>("A_V") > 0.0)
+	    keywords["use_extinct"] = true;
+	} catch (const bad_lexical_cast& ia) {
+	  // A_V is not a number, so assume it is a distribution file
+	  // name
+	  keywords["A_V"] = tokens[1];
+	  filepaths["A_V"] = path(tokens[1]);
+	  keywords["constant_A_V"] = false;
+	  keywords["use_extinct"] = true;
+	}
+
+      } else if (!(tokens[0].compare("nebular_extinction_factor"))) {
+
+	// Nebular extinction factor: can be a number or a PDF
+	try {
+	  // See if A_V,neb/A_V,star is a number
+	  keywords["nebular_extincton_factor"]
+	    = lexical_cast<double>(tokens[1]);
+	  keywords["constant_nebular_extinction_factor"] = true;
+	  if (query<double>("nebular_extinction_factor") != 1.0)
+	    keywords["use_nebular_extinction"] = true;
+	  else
+	    keywords["use_nebular_extinction"] = false;
+	} catch (const bad_lexical_cast& ia) {
+	  // Not a number, so assume it is a distribution file name
+	  keywords["nebular_extinction_factor"] = tokens[1];
+	  keywords["constant_nebular_extinction_factor"] = false;
+	  keywords["use_nebular_extinction"] = true;
+	  filepaths["nebular_extinction_factor"] = path(tokens[1]);
+	}
+	
       } else if (!(tokens[0].compare("yield_mode"))) {
+
+	// Yield mode: list of known combinations of sources for
+	// calcualting yields
 	to_lower(tokens[1]);
 	if (tokens[1].compare("sukhbold16") == 0)
-	  yield_mode = SNII_SUKHBOLD16;
+	  keywords["yield_mode"] = SNII_SUKHBOLD16;
 	else if (tokens[1].compare("karakas16+doherty14") == 0)
-	  yield_mode = AGB_KARAKAS16_DOHERTY14;
+	  keywords["yield_mode"] = AGB_KARAKAS16_DOHERTY14;
 	else if (tokens[1].compare("sukhbold16+karakas16+doherty14") == 0)
-	  yield_mode = SNII_SUKHBOLD16__AGB_KARAKAS16_DOHERTY14;
+	  keywords["yield_mode"] = SNII_SUKHBOLD16__AGB_KARAKAS16_DOHERTY14;
 	else {
 	  ostreams.slug_err_one << "unknown yield_mode: "
 				<< line << std::endl;
 	  bailout(1);
 	}
-      } else if (!(tokens[0].compare("no_decay_isotopes"))) {
-	no_decay = lexical_cast<int>(tokens[1]) != 0;
+	
       } else if (!(tokens[0].compare("isotopes_included"))) {
+
+	// Acceptable values are "union" and "intersection"
 	to_lower(tokens[1]);
 	if (tokens[1].compare("union") == 0)
-	  all_isotopes = true;
+	  keywords["isotopes_included"] = 1;
 	else if (tokens[1].compare("intersection") == 0)
-	  all_isotopes = false;
+	  keywords["isotopes_included"] = 0;
 	else {
 	  ostreams.slug_err_one << "unknown isotopes_included value: "
 				<< line << std::endl;
 	  bailout(1);
 	}
       }
-  // Spectral lines requested for EW calculation
-  else if (!(tokens[0].compare("spectral_lines")))
-  {
-  
-    // Count tokens
-	  nTokExpected = 1;
+      
+      // The rest of these are generic cases where we process by type
+      else if (int *val = boost::get<int>(&(it->second))) {
 
-	  // For this key, we don't know in advance how many lines to
-	  // expect, so parse them one at a time
-	  for (unsigned int tokPtr = 1; tokPtr < tokens.size(); tokPtr++) 
-	  {
+	it->second = lexical_cast<int>(tokens[1]);
+	
+      } else if (double *val = boost::get<double>(&(it->second))) {
 
-	    // Check if this is a comment; if so, stop iterating; if
-	    // not, increment the number of tokens expected
-	    if ((tokens[tokPtr]).compare(0, 1, "#") == 0) 
-	    {
-	      break;
-	    }
-	    nTokExpected++;
+	it->second = lexical_cast<double>(tokens[1]);
 
-	    // This is not a comment; break up by commas
-	    vector<string> linepicksTmp;
-	    split(linepicksTmp, tokens[tokPtr], is_any_of(", "),
-		  token_compress_on);
+      } else if (string *val = boost::get<string>(&(it->second))) {
 
-	    // Push onto photometric band list
-	    for (unsigned int i = 0; i < linepicksTmp.size(); i++) 
-	    {
-	      if (linepicksTmp[i].length() == 0) 
-	      {
-	        continue;
-	      }
-	      linepicks.push_back(linepicksTmp[i]);
-	    }    
-    }
-  
-  
-  } 
+	it->second = tokens[1];
 
-      // Unknown token
-      else {
-	ostreams.slug_err_one << "unknown parameter "
-			      << tokens[0]
-			      << " on line: "
-			      << line << std::endl;
-	bailout(1);
+      } else if (vector<double> *val =
+		 boost::get<vector<double> >(&(it->second))) {
+
+	// Count tokens
+	nTokExpected = 1;
+
+	// For this key type, we don't know in advance how many
+	// entries there will be, so parse them one at a time
+	for (vector<string>::size_type tokPtr = 1;
+	     tokPtr < tokens.size(); tokPtr++) {
+
+	  // Check if this is a comment; if so, stop iterating; if
+	  // not, increment the number of tokens expected
+	  if ((tokens[tokPtr]).compare(0, 1, "#") == 0) break;
+	  nTokExpected++;
+
+	  // This is not a comment; break up by commas
+	  vector<string> tokTmp;
+	  split(tokTmp, tokens[tokPtr], is_any_of(", "),
+		token_compress_on);
+
+	  // Construct vector of doubles to store
+	  vector<double> tokDbl;
+	  for (vector<string>::size_type i = 0; i < tokTmp.size(); i++) {
+	    if (tokTmp[i].length() == 0) continue;
+	    tokDbl.push_back(lexical_cast<double>(tokTmp[i]));
+	  }
+
+	  // Store in keyword
+	  it->second = tokDbl;
+	}
+
+      } else if (vector<string> *val =
+		 boost::get<vector<string> >(&(it->second))) {
+
+	// Count tokens
+	nTokExpected = 1;
+
+	// For this key type, we don't know in advance how many
+	// entries there will be, so parse them one at a time
+	for (vector<string>::size_type tokPtr = 1;
+	     tokPtr < tokens.size(); tokPtr++) {
+
+	  // Check if this is a comment; if so, stop iterating; if
+	  // not, increment the number of tokens expected
+	  if ((tokens[tokPtr]).compare(0, 1, "#") == 0) break;
+	  nTokExpected++;
+
+	  // This is not a comment; break up by commas
+	  vector<string> tokTmp;
+	  split(tokTmp, tokens[tokPtr], is_any_of(", "),
+		token_compress_on);
+
+	  // Store in keyword
+	  it->second = tokTmp;
+	}
+
       }
       
     } catch (const bad_lexical_cast& ia) {
@@ -698,6 +621,29 @@ slug_parmParser::parseFile(std::ifstream &paramFile) {
       if (tokens[nTokExpected].compare(0, 1, "#")) parseError(line);
     }
   }
+
+  // Set various "derived" keywords: these are keywords that are not
+  // allowed in the input file, but are derived from ones that are
+  // allowed, and which we set here to default values if they have not
+  // already been set
+  if (keywords.find("random_cluster_mass") == keywords.end())
+    keywords["random_cluster_mass"] = true;
+  if (keywords.find("constant_sfr") == keywords.end())
+    keywords["constant_sfr"] = true;
+
+  // Initialise file paths from keywords
+  if (query<string>("rng_seed_file").length() > 0)
+    filepaths["rng_seed_file"] = path(query<string>("rng_seed_file"));
+  filepaths["track_dir"] = path(query<string>("track_dir"));
+  filepaths["filter_dir"] = path(query<string>("filters"));
+  filepaths["yield_dir"] = path(query<string>("yield_dir"));
+  filepaths["line_dir"] = path(query<string>("line_dir"));
+  filepaths["imf"] = path(query<string>("imf"));
+  filepaths["cmf"] = path(query<string>("cmf"));
+  filepaths["clf"] = path(query<string>("clf"));
+  filepaths["atmospheres"] = path(query<string>("atmospheres"));
+  filepaths["extinction_curve"] = path(query<string>("extinction_curve"));
+  filepaths["atomic_data"] = path(query<string>("atomic_data"));
 }
 
 
@@ -731,117 +677,179 @@ void
 slug_parmParser::checkParams() {
 
   // Make sure parameters have acceptable values
-  if (verbosity > 2) valueError("verbosity must be 0, 1, or 2");
-  if (nTrials < 1) valueError("n_trials must be >= 1");
-  if (startTime == -constants::big) {
-    if (!logTime)
-      startTime = timeStep;   // Default start time = time step if
-			      // time is not logarithmic
-    else if (!outTimesList) valueError("start_time must be set");
-  } else if (startTime <= 0.0) valueError("start_time must be > 0");
-  if ((timeStep <= 0) && !randomOutputTime && !outTimesList) {
-    if (timeStep == -constants::big)
-      valueError("parameter time_step or output_times must be set");
-    else
-      valueError("time_step must a PDF file name or be > 0");
-  }
-  if (endTime <= 0 && !outTimesList) {
-    if (endTime == -constants::big) {
-      valueError("parameter end_time or output_times must be set");
-    } else {
-      valueError("end_time must be > 0");
-    }
-  }
-  if (outTimesList && outTimes.size() == 0) {
-    valueError("must set at least one time in output_times");
-  }
-  if (outTimesList) {
-    for (vector<double>::size_type i=0; i<outTimes.size()-1; i++) {
-      if ((outTimes[i] >= outTimes[i+1]) || (outTimes[i] <= 0.0)) {
-	valueError("output_times must be > 0 and strictly increasing");
+  if (query<int>("verbosity") > 2) valueError("verbosity must be 0, 1, or 2");
+  if (query<int>("n_trials") < 1) valueError("n_trials must be >= 1");
+
+  // Output times must be set in one of 4 valid ways: user must
+  // specify either (1) output_times as a list of positive, strictly
+  // increasing real numbers, (2) time_step as a string that gives the
+  // name of a PDF file, (3) if log_time is false, all of start_time,
+  // end_time, and time_step must be positive real numbers, (4) if
+  // log_time is false, end_time and time_step must be positive real
+  // numbers. Make sure we have one of these valid
+  // configurations. Also, store the keyword "random_output_times" for
+  // future convenience, as this is easier to query than seeing if
+  // time_step returns a string or a double.
+  if (query<vector<double> >("output_times").size() > 0) {
+    keywords["random_output_times"] = false;
+    vector<double> output_times = query<vector<double> >("output_times");
+    for (vector<double>::size_type i=0; i<output_times.size()-1; i++) {
+      if (output_times[i] >= output_times[i+1] ||
+	  output_times[i] <= 0.0) {
+	valueError("output_times must be a strictly increasing series of positive real numbers");
       }
     }
+  } else if (string *val = boost::get<string>(&keywords["time_step"])) {
+    keywords["random_output_times"] = true;
+  } else {
+    keywords["random_output_times"] = false;
+    if (!query<int>("log_time") &&
+	query<double>("start_time") == -constants::big)
+      keywords["start_time"] = query<double>("time_step");
+    if (query<double>("start_time") < 0)
+      valueError("start_time must be set to a positive real number");
+    if (query<double>("end_time") < 0)
+      valueError("end_time must be set to a positive real number");
+    if (query<double>("time_step") < 0)
+      valueError("time_step must be set to a positive real number or a PDF file name");
   }
-  if (!constantSFR && !randomSFR && run_galaxy_sim) {
-    if (sfh.length() == 0) {
+
+  // SFR can be set by specifying a positive constant SFR, a PDF file,
+  // or a star formation history file; make sure one of these is done
+  // correctly
+  if (query<int>("sim_type") == galaxy_type) {
+    if (!query<int>("constant_sfr") &&
+	!query<int>("random_sfr") &&
+	query<string>("sfh").length() == 0) {
       valueError("SFH requested, but no SFH file specified");
-    }    
+    } else if (query<int>("constant_sfr")) {
+      if (query<double>("sfr") <= 0.0)
+	valueError("SFR must be a positive number");
+    }
   }
-  if (!run_galaxy_sim && cluster_mass < 0 && !randomClusterMass) {
-    valueError("cluster_mass must be either cmf or a number > 0 for cluster sim");
+
+  // If we have been told to use a constant cluster mass, make sure it
+  // is positive
+  if (query<int>("sim_type") == cluster_type &&
+      !query<int>("random_cluster_mass")) {
+    if (query<double>("cluster_mass") < 0)
+      valueError("cluster_mass must be either cmf or a number > 0 for cluster sim");
   }
-  if ((fClust < 0 || fClust > 1) && run_galaxy_sim) {
+
+  // Make sure clustering fraction is 0 - 1
+  if ((query<double>("clust_frac") < 0 ||
+       query<double>("clust_frac") > 1) &&
+      query<int>("sim_type") == galaxy_type) {
     valueError("clust_frac must be in the range [0,1]");
   }
-  if (metallicity < 0 && metallicity != -constants::big) {
-    valueError("metallicity must be >= 0");
-  }
-  if (track_set == NO_TRACK_SET && metallicity != -constants::big) {
+
+  // Make sure we have a valid, non-contradictory metallicity
+  if (query<int>("track_set") == NO_TRACK_SET &&
+      query<double>("metallicity") != -constants::big) {
     ostreams.slug_warn_one << "metallicity set but tracks specified "
 			   << "by file name; metallicity will be set "
 			   << "to value corresponding to track file, and "
 			   << "input metallicity will be ignored"
 			   << std::endl;
   }
-  if (nebular_phi < 0 || nebular_phi > 1) {
+  if (query<double>("metallicity") < 0) {
+    if (query<double>("metallicity") == -constants::big) {
+      keywords["metallicity"] = 1.0;
+    } else {
+      valueError("metallicity must be >= 0");
+    }
+  }
+
+  // Make sure that nebular phi parameter is physically allowed
+  if (query<double>("nebular_phi") < 0 ||
+      query<double>("nebular_phi") > 1) {
     valueError("nebular_phi must be in the range [0,1]");
   }
-  if (lamers_loss && (!randomClusterMass || !randomOutputTime)) {
+
+  // Make sure that, if we've been told ot use the Lamers mass loss
+  // model, we are in the case where it works
+  if (query<int>("lamers_loss") &&
+      (!query<int>("random_cluster_mass") ||
+       !query<int>("random_output_times"))) {
     valueError("Lamers (2005) cluster evaporation model only avaialable with random cluster masses and output times");
   }
-  if (lamers_loss && lamers_t4 <= 0.0) {
+  if (query<int>("lamers_loss") && query<double>("lamers_t4") <= 0.0) {
     valueError("Lamers (2005) t4 parameter must be > 0");
   }
-  if (lamers_loss && lamers_gamma <= 0.0) {
+  if (query<int>("lamers_loss") && query<double>("lamers_gamma") <= 0.0) {
     valueError("Lamers (2005) gamma parameter must be > 0");
   }
-  if (!writeClusterProp && !writeClusterPhot 
-      && !writeClusterSpec && !writeClusterYield
-      && !writeIntegratedPhot && !writeIntegratedSpec
-      && !writeIntegratedProp && !writeIntegratedYield
-      && !writeClusterEW) {
+
+  // Make sure some output has been requested
+  if (!query<int>("out_cluster") &&
+      !query<int>("out_cluster_phot") &&
+      !query<int>("out_cluster_spec") &&
+      !query<int>("out_cluster_yield") &&
+      !query<int>("out_cluster_sn") &&
+      !query<int>("out_cluster_ew") &&
+      !query<int>("out_integrated") &&
+      !query<int>("out_integrated_phot") &&
+      !query<int>("out_integrated_spec") &&
+      !query<int>("out_integrated_yield") &&
+      !query<int>("out_integrated_sn")) {  
     valueError("no output requested");
   }
-  if ((writeClusterPhot || writeIntegratedPhot) && 
-      (photBand.size() == 0)) {
+
+  // Make sure that, if photometry has been requested, photometric
+  // bands have been specified
+  if ((query<int>("out_cluster_phot") ||
+       query<int>("out_integrated_phot")) && 
+      (query<vector<string> >("phot_bands").size() == 0)) {
     valueError("photometry requested, but no photometric bands specified");
   }
-  if (writeClusterEW && linepicks.size()==0) {
-    valueError("equivalent widths requested but no lines specified");
+
+  // Make sure that, if equivalent widths have been requested, lines
+  // have been specified
+  vector<string> spectral_lines = query<vector<string> >("spectral_lines");
+  if (query<int>("out_cluster_ew") && spectral_lines.size()==0) {
+    valueError("equivalent widths requested, but no lines specified");
   }
-  if (writeClusterEW && specsyn_mode != SB99_HRUV) {
+
+  // Make sure that equivalent widths are requested only in the modes
+  // that support them
+  if (query<int>("out_cluster_ew") &&
+      query<int>("specsyn_mode") != SB99_HRUV) {
     valueError("equivalent widths only available with sb99hruv spectral synthesis mode");
   }
-  if (writeClusterEW && run_galaxy_sim) {
+  if (query<int>("out_cluster_ew") &&
+      query<int>("sim_type") == galaxy_type) {
     valueError("equivalent widths not yet supported in galaxy simulations");
   }
-  if (writeClusterEW && (out_mode == ASCII ||
-			 out_mode == BINARY)) {
+  if (query<int>("out_cluster_ew") &&
+      (query<int>("output_mode") == ASCII ||
+       query<int>("output_mode") == BINARY)) {
     valueError("equivalent widths not yet supported in ASCII or BINARY output modes");
   }
 
   // Make sure filter names are unique; if not, eliminate duplicates
   // and spit out a warning
+  vector<string> phot_bands = query<vector<string> >("phot_bands");
   vector<vector<double>::size_type> duplicates;
-  for (vector<double>::size_type i=0; i<photBand.size(); i++)
-    for (vector<double>::size_type j=i+1; j<photBand.size(); j++)
-      if (photBand[i] == photBand[j]) duplicates.push_back(j);
+  for (vector<double>::size_type i=0; i<phot_bands.size(); i++)
+    for (vector<double>::size_type j=i+1; j<phot_bands.size(); j++)
+      if (phot_bands[i] == phot_bands[j]) duplicates.push_back(j);
   vector<vector<double>::size_type>::reverse_iterator 
     rit = duplicates.rbegin();
   for ( ; rit != duplicates.rend(); ++rit) {
     vector<double>::size_type i = *rit;
     ostringstream ss;
-    ss << "ignoring duplicate photometric band " << photBand[i];
+    ss << "ignoring duplicate photometric band " << phot_bands[i];
     ostreams.slug_warn_one << ss.str() << std::endl;
-    photBand.erase(photBand.begin() + i);
+    phot_bands.erase(phot_bands.begin() + i);
   }
+  keywords["phot_bands"] = phot_bands;
 
   // Make sure lines are unique; if not, eliminate duplicates
   // and spit out a warning
   duplicates.clear();
-  for (vector<double>::size_type i=0; i<linepicks.size(); i++) {
-    for (vector<double>::size_type j=i+1; j<linepicks.size(); j++) {
-      if (linepicks[i] == linepicks[j]) {
+  for (vector<double>::size_type i=0; i<spectral_lines.size(); i++) {
+    for (vector<double>::size_type j=i+1; j<spectral_lines.size(); j++) {
+      if (spectral_lines[i] == spectral_lines[j]) {
         duplicates.push_back(j);
       }
     }
@@ -850,10 +858,11 @@ slug_parmParser::checkParams() {
   for ( ; rit != duplicates.rend(); ++rit) {
     vector<double>::size_type i = *rit;
     ostringstream ss;
-    ss << "ignoring duplicate spectral line " << linepicks[i];
+    ss << "ignoring duplicate spectral line " << spectral_lines[i];
     ostreams.slug_warn_one << ss.str() << std::endl;
-    linepicks.erase(linepicks.begin() + i);
-  }  
+    spectral_lines.erase(spectral_lines.begin() + i);
+  }
+  keywords["spectral_lines"] = spectral_lines;
 
   // See if the SLUG_DIR environment variable is set, for use in
   // setting up default paths. If not, set it to current working
@@ -865,29 +874,14 @@ slug_parmParser::checkParams() {
   if (slug_dir.length() == 0) slug_dir = current_path().string();
   path slug_path(slug_dir);
 
-  // If any of the input file names/directories are relative paths,
-  // take them to be relative to the SLUG_DIR unless we find a file of
-  // that name in the current working directory
-  vector<string *> dirs;
-  dirs.push_back(&imf);
-  dirs.push_back(&cmf);
-  dirs.push_back(&clf);
-  dirs.push_back(&track);
-  dirs.push_back(&track_dir);
-  dirs.push_back(&atmos_dir);
-  dirs.push_back(&atomic_dir);
-  dirs.push_back(&filter_dir);
-  dirs.push_back(&line_dir);
-  dirs.push_back(&extinct_curve);
-  dirs.push_back(&AV_dist);
-  dirs.push_back(&neb_extinct_fac_dist);
-  dirs.push_back(&yield_dir);
-  dirs.push_back(&out_time_dist);
-  for (vector<string>::size_type i=0; i<dirs.size(); i++) {
-    path dirpath(*(dirs[i]));
-    if (!dirpath.is_absolute()) {
-      if (!exists(dirpath)) {
-	*(dirs[i]) = (slug_path / dirpath).string();
+  // If any of the file paths we have been given are relative paths, look
+  // for a file of that name in the current working directory, and, if
+  // one doesn't exist, prepend the environment variable SLUG_DIR
+  for (map<const string, path>::iterator it=filepaths.begin();
+       it != filepaths.end(); ++it) {
+    if (!it->second.is_absolute()) {
+      if (!exists(it->second)) {
+	it->second = (slug_path / it->second);
       }
     }
   }
@@ -901,27 +895,32 @@ void slug_parmParser::restartSetup() {
 
   // Get list of output file types
   vector<string> outtypes;
-  if (writeIntegratedProp && run_galaxy_sim)
+  if (query<int>("out_integrated") &&
+      query<int>("sim_type") == galaxy_type)
     outtypes.push_back("_integrated_prop");
-  if (writeIntegratedSpec && run_galaxy_sim)
+  if (query<int>("out_integrated_spec") &&
+      query<int>("sim_type") == galaxy_type)
     outtypes.push_back("_integrated_spec");
-  if (writeIntegratedPhot && run_galaxy_sim)
+  if (query<int>("out_integrated_phot") &&
+      query<int>("sim_type") == galaxy_type)
     outtypes.push_back("_integrated_phot");
-  if (writeIntegratedYield && run_galaxy_sim)
+  if (query<int>("out_integrated_yield") &&
+      query<int>("sim_type") == galaxy_type)
     outtypes.push_back("_integrated_yield");
-  if (writeIntegratedSN && run_galaxy_sim)
+  if (query<int>("out_integrated_sn") &&
+      query<int>("sim_type") == galaxy_type)
     outtypes.push_back("_integrated_sn");
-  if (writeClusterProp)
+  if (query<int>("out_cluster"))
     outtypes.push_back("_cluster_prop");
-  if (writeClusterSpec)
+  if (query<int>("out_cluster_spec"))
     outtypes.push_back("_cluster_spec");
-  if (writeClusterPhot)
+  if (query<int>("out_cluster_phot"))
     outtypes.push_back("_cluster_phot");
-  if (writeClusterSN)
+  if (query<int>("out_cluster_sn"))
     outtypes.push_back("_cluster_sn");
-  if (writeClusterYield)
+  if (query<int>("out_cluster_yield"))
     outtypes.push_back("_cluster_yield");
-  if (writeClusterEW)
+  if (query<int>("out_cluster_ew"))
     outtypes.push_back("_cluster_ew");
 
   // Get parallel rank indicator
@@ -936,10 +935,10 @@ void slug_parmParser::restartSetup() {
 
   // Get extension
   string ext;
-  if (out_mode == ASCII) ext = ".txt";
-  else if (out_mode == BINARY) ext = ".bin";
+  if (query<int>("output_mode") == ASCII) ext = ".txt";
+  else if (query<int>("output_mode") == BINARY) ext = ".bin";
 #ifdef ENABLE_FITS
-  else if (out_mode == FITS) ext = ".fits";
+  else if (query<int>("output_mode") == FITS) ext = ".fits";
 #endif
 
   // Now loop through checkpoints, seeing which ones exist, and
@@ -954,13 +953,14 @@ void slug_parmParser::restartSetup() {
 
       // Construct checkpoint file name
       ostringstream ss;
-      ss << "_chk" << setfill('0') << setw(4) << checkpointCtr;
-      string fname = model + par_str + ss.str() + outtypes[i] + ext;
-      path full_path = path(outDir) / fname;
+      ss << "_chk" << setfill('0') << setw(4) << checkpoint_ctr;
+      string fname = query<string>("model_name")
+	+ par_str + ss.str() + outtypes[i] + ext;
+      path full_path = path(query<string>("out_dir")) / fname;
 
       // Try to open file and read number of trials from it; bail if
       // any of this fails
-      if (out_mode == ASCII) {
+      if (query<int>("output_mode") == ASCII) {
 	
 	// Try to open
 	std::ifstream checkpoint_file;
@@ -997,7 +997,7 @@ void slug_parmParser::restartSetup() {
 	// Close
 	checkpoint_file.close();
 	
-      } else if (out_mode == BINARY) {
+      } else if (query<int>("output_mode") == BINARY) {
 	
 	// Try to open
 	std::ifstream checkpoint_file;
@@ -1027,7 +1027,7 @@ void slug_parmParser::restartSetup() {
 
       }
 #ifdef ENABLE_FITS
-      else if (out_mode == FITS) {
+      else if (query<int>("output_mode") == FITS) {
 
 	// Try to open file
 	fitsfile *checkpoint_file;
@@ -1072,32 +1072,32 @@ void slug_parmParser::restartSetup() {
     // If we made it to here, this is a valid checkpoint. Add the
     // number of trials it contains to our running count, and
     // increment the checkpoint counter
-    checkpointCtr++;
-    checkpointTrials += trials_ctr[0];
+    checkpoint_ctr++;
+    checkpoint_trials += trials_ctr[0];
   }
 
   // If we are in MPI mode, we need to sum the number of completed
   // trials and files over all processors
 #ifdef ENABLE_MPI
   unsigned int global_files, global_trials;
-  MPI_Allreduce(&checkpointCtr, &global_files, 1, MPI_UNSIGNED_LONG,
+  MPI_Allreduce(&checkpoint_ctr, &global_files, 1, MPI_UNSIGNED_LONG,
 		MPI_SUM, comm);
-  MPI_Allreduce(&checkpointTrials, &global_trials, 1, MPI_UNSIGNED_LONG,
+  MPI_Allreduce(&checkpoint_trials, &global_trials, 1, MPI_UNSIGNED_LONG,
 		MPI_SUM, comm);
-  checkpointTrials = global_trials;
+  checkpoint_trials = global_trials;
 #endif
 
   // Print if verbose
-  if (verbosity > 0) {
+  if (query<int>("verbosity") > 0) {
     ostreams.slug_out_one
       << "found "
 #ifdef ENABLE_MPI
       << global_files
 #else
-      << checkpointCtr
+      << checkpoint_ctr
 #endif
       << " checkpoint "
-      << "files containing " << checkpointTrials << " trials"
+      << "files containing " << checkpoint_trials << " trials"
       << std::endl;
   }
 }
@@ -1114,8 +1114,8 @@ slug_parmParser::writeParams() const {
 #endif
 
   // Form output file name
-  string fname(model + "_summary.txt");
-  path full_path(outDir);
+  string fname(query<string>("model_name") + "_summary.txt");
+  path full_path(query<string>("out_dir"));
   full_path /= fname;
 
   // Open file for output
@@ -1130,264 +1130,214 @@ slug_parmParser::writeParams() const {
 
   // Write parameters to file
   paramFile << "SLUG WAS RUN WITH THE FOLLOWING PARAMETERS" << endl;
-  paramFile << "model_name           " << model << endl;
-  paramFile << "out_dir              " << outDir << endl;
+  paramFile << "model_name           " << query<string>("model_name") << endl;
+  paramFile << "out_dir              " << query<string>("out_dir") << endl;
   paramFile << "sim_type             ";
-  if (run_galaxy_sim)
+  if (query<int>("sim_type") == galaxy_type)
     paramFile << "galaxy" << endl;
   else
     paramFile << "cluster" << endl;
-  paramFile << "n_trials             " << nTrials << endl;
-  if (!randomOutputTime) {
-    paramFile << "time_step            " << timeStep << endl;
-    paramFile << "end_time             " << endTime << endl;
+  paramFile << "n_trials             " << query<int>("n_trials") << endl;
+  if (query<vector<double> >("output_times").size() > 0) {
+    paramFile << "output_times        ";
+    vector<double> output_times = query<vector<double> >("output_times");
+    for (vector<double>::size_type i=0; i<output_times.size(); i++)
+      paramFile << " " << output_times[i];
+    paramFile << endl;
+  } else if (query<int>("random_output_times")) {
+    paramFile << "time_step            "
+	      << query<string>("time_step") << endl;
   } else {
-    paramFile << "output_time_dist     " << out_time_dist << endl;
+    paramFile << "time_step            " << query<double>("time_step") << endl;
+    paramFile << "start_time           " << query<double>("start_time") << endl;
+    paramFile << "end_time             " << query<double>("end_time") << endl;
   }
-  if (run_galaxy_sim) {
-    if (constantSFR)
-      paramFile << "SFR                  " << sfr << endl;
-    else if (randomSFR)
-      paramFile << "SFR                  " << sfr_file << endl;
+  if (query<int>("sim_type") == galaxy_type) {
+    if (query<int>("constant_sfr"))
+      paramFile << "SFR                  " << query<double>("sfr") << endl;
+    else if (query<int>("random_sfr"))
+      paramFile << "SFR                  " << fpath("sfr") << endl;
     else
-      paramFile << "SFH                  " << sfh << endl;
+      paramFile << "SFH                  " << fpath("sfh") << endl;
   }
-  paramFile << "IMF                  " << imf << endl;
-  if (run_galaxy_sim || randomClusterMass)
-    paramFile << "CMF                  " << cmf << endl;
-  if (!run_galaxy_sim && !randomClusterMass)
-    paramFile << "cluster_mass         " << cluster_mass << endl;
-  paramFile << "CLF                  " << clf << endl;
-  paramFile << "tracks               " << track << endl;
-  paramFile << "atmos_dir            " << atmos_dir << endl;
-  paramFile << "yield_dir            " << yield_dir << endl;
-  paramFile << "min_stoch_mass       " << min_stoch_mass << endl;
-  paramFile << "redshift             " << z << endl;
-  if (metallicity != -constants::big)
-    paramFile << "metallicity          " << metallicity << endl;
+  paramFile << "IMF                  " << fpath("imf") << endl;
+  if (query<int>("sim_type") == cluster_type ||
+      query<int>("random_cluster_mass"))
+    paramFile << "CMF                  " << fpath("cmf") << endl;
+  if (query<int>("sim_type") == cluster_type &&
+      !query<int>("random_cluster_mass"))
+    paramFile << "cluster_mass         " << query<double>("cluster_mass")
+	      << endl;
+  paramFile << "CLF                  " << fpath("clf") << endl;
+  switch (static_cast<trackSet>(query<int>("track_set"))) {
+  case NO_TRACK_SET: {
+    paramFile << "tracks               " << fpath("tracks") << endl;
+    break;
+  }
+  case GENEVA_2013_VVCRIT_00: {
+    paramFile << "tracks               geneva_2013_vvcrit_00" << endl;
+    break;
+  }
+  case GENEVA_2013_VVCRIT_40: {
+    paramFile << "tracks               geneva_2013_vvcrit_40" << endl;
+    break;
+  }
+  case GENEVA_MDOT_STD: {
+    paramFile << "tracks               geneva_mdot_std" << endl;
+    break;
+  }
+  case GENEVA_MDOT_ENHANCED: {
+    paramFile << "tracks               geneva_mdot_enhanced" << endl;
+    break;
+  }
+  case PADOVA_TPAGB_YES: {
+    paramFile << "tracks               padova_tp_agb_yes" << endl;
+    break;
+  }
+  case PADOVA_TPAGB_NO: {
+    paramFile << "tracks               padova_tp_agb_no" << endl;
+    break;
+  }
+  case MIST_2016_VVCRIT_00: {
+    paramFile << "tracks               mist_2016_vvcrit_00" << endl;
+    break;
+  }
+  case MIST_2016_VVCRIT_40: {
+    paramFile << "tracks               mist_2016_vvcrit_40" << endl;
+    break;
+  }
+  }
+  paramFile << "atmospheres          " << fpath("atmospheres") << endl;
+  paramFile << "yield_dir            " << fpath("yield_dir") << endl;
+  paramFile << "min_stoch_mass       " << query<double>("min_stoch_mass")
+	    << endl;
+  paramFile << "redshift             " << query<double>("redshift") << endl;
+  if (query<double>("metallicity") != -constants::big)
+    paramFile << "metallicity          "
+	      << query<double>("metallicity") << endl;
   paramFile << "specsyn_mode         ";
-  if (specsyn_mode == PLANCK) {
+  if (query<int>("specsyn_mode") == PLANCK) {
     paramFile << "planck" << endl;
-  } else if (specsyn_mode == KURUCZ) {
+  } else if (query<int>("specsyn_mode") == KURUCZ) {
     paramFile << "kurucz" << endl;
-  } else if (specsyn_mode == KURUCZ_HILLIER) {
+  } else if (query<int>("specsyn_mode") == KURUCZ_HILLIER) {
     paramFile << "kurucz+hillier" << endl;
-  } else if (specsyn_mode == SB99) {
+  } else if (query<int>("specsyn_mode") == SB99) {
     paramFile << "sb99" << endl;
-  }
-  else if (specsyn_mode == SB99_HRUV)
-  {    
+  } else if (query<int>("specsyn_mode") == SB99_HRUV) {    
     paramFile << "sb99hruv" << endl; 
   }  
   paramFile << "yield_mode           ";
-  if (yield_mode == SNII_SUKHBOLD16) {
+  switch (query<int>("yield_mode")) {
+  case SNII_SUKHBOLD16: {
     paramFile << "SNII: Sukhbold+16; AGB: none" << endl;
-  } else if (yield_mode == AGB_KARAKAS16_DOHERTY14) {
+    break;
+  }
+  case AGB_KARAKAS16_DOHERTY14: {
     paramFile << "SNII: none; AGB: Karakas & Lugaro 2016 + Doherty+ 2014" << endl;
-  } else if (yield_mode == SNII_SUKHBOLD16__AGB_KARAKAS16_DOHERTY14) {
+    break;
+  }
+  case SNII_SUKHBOLD16__AGB_KARAKAS16_DOHERTY14: {
     paramFile << "SNII: Sukhbold+16; AGB: Karakas & Lugaro 2016 + Doherty+ 2014" << endl;
+    break;
   }
-  if (use_extinct) {
-    paramFile << "extinction           " << "yes" << endl;
-    if (constantAV)
-      paramFile << "A_V                  " << A_V << endl;
-    else
-      paramFile << "A_V                  " << AV_dist << endl;
-    paramFile << "extinction_curve     " << extinct_curve << endl;
-  } else {
-    paramFile << "extinction           " << "no" << endl;
   }
-  if (use_nebular) {
+  if (!query<int>("constant_A_V")) {
+    paramFile << "A_V                  " << fpath("A_V") << endl;
+    paramFile << "extinction_curve     " << fpath("extinction_curve") << endl;
+  } else if (query<int>("use_extinct")) {
+    paramFile << "A_V                  " << query<double>("A_V") << endl;
+    paramFile << "extinction_curve     " << fpath("extinction_curve") << endl;
+  }
+  if (query<int>("compute_nebular")) {
     paramFile << "nebular_emission     " << "yes" << endl;
-    paramFile << "nebular_density      " << nebular_den << endl;
-    paramFile << "nebular_temperature  " << nebular_temp << endl;
-    paramFile << "nebular_phi          " << nebular_phi << endl;
-    paramFile << "nebular_logU         " << nebular_logU << endl;
+    paramFile << "nebular_density      " << query<double>("nebular_den")
+	      << endl;
+    paramFile << "nebular_temperature  " << query<double>("nebular_temp")
+	      << endl;
+    paramFile << "nebular_phi          " << query<double>("nebular_phi")
+	      << endl;
+    paramFile << "nebular_logU         " << query<double>("nebular_logU")
+	      << endl;
+    paramFile << "nebular_no_metals    " << query<int>("nebular_no_metals")
+	      << endl;
   } else {
     paramFile << "nebular_emission     " << "no" << endl;
   }
-  if (lamers_loss) {
+  if (query<int>("lamers_loss")) {
     paramFile << "lamers_evaporation  " << "yes" << endl;
-    paramFile << "lamers_t4           " << lamers_t4 << endl;
-    paramFile << "lamers_gamma        " << lamers_gamma << endl;
+    paramFile << "lamers_t4           " << query<double>("lamers_t4")
+	      << endl;
+    paramFile << "lamers_gamma        " << query<double>("lamers_gamma")
+	      << endl;
   }
-  if (run_galaxy_sim)
-    paramFile << "clust_frac           " << fClust << endl;
-  if (writeClusterPhot || writeIntegratedPhot) {
+  if (query<int>("sim_type") == galaxy_type)
+    paramFile << "clust_frac           " << query<double>("clust_frac") << endl;
+  if (query<int>("out_cluster_phot") || query<int>("out_integrated_phot")) {
     paramFile << "phot_mode            ";
-    if (phot_mode == L_NU) {
-      paramFile << "L_nu" << endl;
-    } else if (phot_mode == L_LAMBDA) {
-      paramFile << "L_lambda" << endl;
-    } else if (phot_mode == AB) {
-      paramFile << "AB" << endl;
-    } else if (phot_mode == STMAG) {
-      paramFile << "STMAG" << endl;
-    } else if (phot_mode == VEGA) {
-      paramFile << "Vega" << endl;
+    switch (query<int>("phot_mode")) {
+    case L_NU:     { paramFile << "L_nu" << endl; break; }
+    case L_LAMBDA: { paramFile << "L_lambda" << endl; break; }
+    case AB:       { paramFile << "AB" << endl; break; }
+    case STMAG:    { paramFile << "STMAG" << endl; break; }
+    case VEGA:     { paramFile << "Vega" << endl; break; }
     }
   }
-  paramFile << "out_cluster          " << writeClusterProp << endl;
-  paramFile << "out_cluster_phot     " << writeClusterPhot << endl;
-  paramFile << "out_cluster_spec     " << writeClusterSpec << endl;
-  paramFile << "out_cluster_sn       " << writeClusterSN << endl;
-  paramFile << "out_cluster_yield    " << writeClusterYield << endl;
-  paramFile << "out_cluster_ew       " << writeClusterEW   << endl;
-  if (run_galaxy_sim) {
-    paramFile << "out_integrated       " << writeIntegratedProp << endl;
-    paramFile << "out_integrated_phot  " << writeIntegratedPhot << endl;
-    paramFile << "out_integrated_spec  " << writeIntegratedSpec << endl;
-    paramFile << "out_integrated_sn    " << writeIntegratedSN << endl;
-    paramFile << "out_integrated_yield " << writeIntegratedYield << endl;
+  paramFile << "out_cluster          "
+	    << query<int>("out_cluster") << endl;
+  paramFile << "out_cluster_phot     "
+	    << query<int>("out_cluster_phot") << endl;
+  paramFile << "out_cluster_spec     "
+	    << query<int>("out_cluster_spec") << endl;
+  paramFile << "out_cluster_sn       "
+	    << query<int>("out_cluster_sn") << endl;
+  paramFile << "out_cluster_yield    "
+	    << query<int>("out_cluster_yield") << endl;
+  paramFile << "out_cluster_ew       "
+	    << query<int>("out_cluster_ew")   << endl;
+  if (query<int>("sim_type") == galaxy_type) {
+    paramFile << "out_integrated       "
+	      << query<int>("out_integrated") << endl;
+    paramFile << "out_integrated_phot  "
+	      << query<int>("out_integrated_phot") << endl;
+    paramFile << "out_integrated_spec  "
+	      << query<int>("out_integrated_spec") << endl;
+    paramFile << "out_integrated_sn    "
+	      << query<int>("out_integrated_sn") << endl;
+    paramFile << "out_integrated_yield "
+	      << query<int>("out_integrated_yield") << endl;
   }
-  if (photBand.size() > 0) {
+  const vector<string>& phot_bands = query<vector<string> >("phot_bands");
+  if (phot_bands.size() > 0) {
     paramFile << "phot_bands           ";
-    for (unsigned int i=0; i<photBand.size(); i++) {
-      paramFile << photBand[i];
-      if (i < photBand.size()-1) paramFile << ", ";
+    for (vector<string>::size_type i=0; i<phot_bands.size(); i++) {
+      paramFile << phot_bands[i];
+      if (i < phot_bands.size()-1) paramFile << ", ";
     }
     paramFile << endl;
   }
-  if (linepicks.size() > 0)
-  {
+  const vector<string>& spectral_lines =
+    query<vector<string> >("spectral_lines");
+  if (spectral_lines.size() > 0) {
     paramFile << "spectral_lines        ";
-    for (unsigned int i=0; i<linepicks.size(); i++)
-    {
-      paramFile << linepicks[i];
-      if (i < linepicks.size()-1)
-      {
-        paramFile << ", ";
-      }
+    for (vector<string>::size_type i=0; i<spectral_lines.size(); i++) {
+      paramFile << spectral_lines[i];
+      if (i < spectral_lines.size()-1) paramFile << ", ";
     }
   }
-  if (out_mode == BINARY)
+  if (query<int>("output_mode") == BINARY)
     paramFile << "output_mode          binary" << endl;
-  else if (out_mode == ASCII)
-    paramFile << "output_mode          ASCII" << endl;
+  else if (query<int>("output_mode") == ASCII)
+    paramFile << "output_mode          ascii" << endl;
+#ifdef ENABLE_FITS
+  else
+    paramFile << "output_mode          fits" << endl;
+#endif
 
   // Close
   paramFile.close();
 }
 
-////////////////////////////////////////////////////////////////////////
-// Functions that just return copies of internal data
-////////////////////////////////////////////////////////////////////////
 
-unsigned int slug_parmParser::get_verbosity() const { return verbosity; }
-unsigned int slug_parmParser::get_nTrials() const { return nTrials; }
-unsigned int slug_parmParser::get_checkpoint_interval() const
-{ return checkpointInterval; }
-unsigned int slug_parmParser::get_checkpoint_ctr() const
-{ return checkpointCtr; }
-unsigned int slug_parmParser::get_checkpoint_trials() const
-{ return checkpointTrials; }
-double slug_parmParser::get_startTime() const { return startTime; }
-double slug_parmParser::get_timeStep() const { return timeStep; }
-double slug_parmParser::get_endTime() const { return endTime; }
-bool slug_parmParser::get_logTime() const { return logTime; }
-bool slug_parmParser::get_constantSFR() const { return constantSFR; }
-bool slug_parmParser::get_randomSFR() const { return randomSFR; }
-bool slug_parmParser::get_constantAV() const { return constantAV; }
-bool slug_parmParser::get_use_neb_extinct() const
-{ return use_neb_extinct; }
-bool slug_parmParser::get_constant_neb_extinct_fac() const
-{ return constant_neb_extinct_fac; }
-double slug_parmParser::get_SFR() const { return sfr; }
-double slug_parmParser::get_AV() const { return A_V; }
-double slug_parmParser::get_neb_extinct_fac() const { return neb_extinct_fac; }
-double slug_parmParser::get_z() const { return z; }
-double slug_parmParser::get_metallicity() const {
-  if (metallicity != -constants::big) return metallicity; else return 1.0; }
-double slug_parmParser::get_min_stoch_mass() const { return min_stoch_mass; }
-const char *slug_parmParser::get_SFH() const { return sfh.c_str(); }
-const char *slug_parmParser::get_SFR_file() const { return sfr_file.c_str(); }
-const char *slug_parmParser::get_IMF() const { return imf.c_str(); }
-const char *slug_parmParser::get_CMF() const { return cmf.c_str(); }
-const char *slug_parmParser::get_CLF() const { return clf.c_str(); }
-const char *slug_parmParser::get_trackFile() const { return track.c_str(); }
-const char *slug_parmParser::get_track_dir() const { return track_dir.c_str(); }
-const char *slug_parmParser::get_atmos_dir() const { return atmos_dir.c_str(); }
-const char *slug_parmParser::get_atomic_dir() const 
-{ return atomic_dir.c_str(); }
-const char *slug_parmParser::get_yield_dir() const 
-{ return yield_dir.c_str(); }
-const char *slug_parmParser::get_extinct_curve() const 
-{ return extinct_curve.c_str(); }
-const char *slug_parmParser::get_AV_dist() const 
-{ return AV_dist.c_str(); }
-const char *slug_parmParser::get_neb_extinct_fac_dist() const 
-{ return neb_extinct_fac_dist.c_str(); }
-const char *slug_parmParser::get_outtime_dist() const 
-{ return out_time_dist.c_str(); }
-const char *slug_parmParser::get_filter_dir() const 
-{ return filter_dir.c_str(); }
-const char *slug_parmParser::get_line_dir() const
-{ return line_dir.c_str(); }
-const char *slug_parmParser::get_modelName() const { return model.c_str(); }
-const char *slug_parmParser::get_outDir() 
-const { return outDir.c_str(); }
-double slug_parmParser::get_fClust() const { return fClust; }
-vector<string>::size_type slug_parmParser::get_nPhot()
-const { return photBand.size(); }
-const char *slug_parmParser::get_photBand(unsigned int n)
-const { return photBand[n].c_str(); }
-vector<string>::size_type slug_parmParser::get_nLines()
-const { return linepicks.size();}
-const char *slug_parmParser::get_linepicks(unsigned int n)
-const { return linepicks[n].c_str(); }
-const vector<string>& slug_parmParser::get_linepicks() const
-{ return linepicks; }
-bool slug_parmParser::get_writeClusterProp()
-const { return writeClusterProp; }
-bool slug_parmParser::get_writeClusterPhot()
-const { return writeClusterPhot; }
-bool slug_parmParser::get_writeClusterSpec()
-const { return writeClusterSpec; }
-bool slug_parmParser::get_writeClusterSN()
-const { return writeClusterSN; }
-bool slug_parmParser::get_writeClusterYield()
-const { return writeClusterYield; }
-bool slug_parmParser::get_writeIntegratedProp()
-const { return writeIntegratedProp; }
-bool slug_parmParser::get_writeIntegratedPhot()
-const { return writeIntegratedPhot; }
-bool slug_parmParser::get_writeIntegratedSpec()
-const { return writeIntegratedSpec; }
-bool slug_parmParser::get_writeIntegratedSN()
-const { return writeIntegratedSN; }
-bool slug_parmParser::get_writeIntegratedYield()
-const { return writeIntegratedYield; }
-bool slug_parmParser::get_writeClusterEW()
-const { return writeClusterEW; }
-outputMode slug_parmParser::get_outputMode() const { return out_mode; }
-specsynMode slug_parmParser::get_specsynMode() const { return specsyn_mode; }
-trackSet slug_parmParser::get_trackSet() const { return track_set; }
-photMode slug_parmParser::get_photMode() const { return phot_mode; }
-yieldMode slug_parmParser::get_yieldMode() const { return yield_mode; }
-bool slug_parmParser::galaxy_sim() const { return run_galaxy_sim; }
-double slug_parmParser::get_cluster_mass() const { return cluster_mass; }
-bool slug_parmParser::get_random_cluster_mass() const 
-{ return randomClusterMass;}
-const vector<string>& slug_parmParser::get_photBand() const
-{ return photBand; }
-unsigned int slug_parmParser::get_rng_offset() const
-{ return rng_offset; }
-bool slug_parmParser::save_rng_seed() const { return save_seed; }
-bool slug_parmParser::read_rng_seed() const { return read_seed; }
-const string slug_parmParser::rng_seed_file() const { return seed_file; }
-bool slug_parmParser::get_use_extinct() const { return use_extinct; }
-bool slug_parmParser::get_random_output_time() const 
-{ return randomOutputTime; }
-bool slug_parmParser::get_use_nebular() const { return use_nebular; }
-bool slug_parmParser::nebular_no_metals() const { return neb_no_metals; }
-double slug_parmParser::get_nebular_den() const { return nebular_den; }
-double slug_parmParser::get_nebular_temp() const { return nebular_temp; }
-double slug_parmParser::get_nebular_phi() const { return nebular_phi; }
-double slug_parmParser::get_nebular_logU() const { return nebular_logU; }
-bool slug_parmParser::get_outTimesList() const { return outTimesList; }
-const vector<double>& slug_parmParser::get_outTimes() const { return outTimes; }
-bool slug_parmParser::output_all_isotopes() const { return all_isotopes; }
-bool slug_parmParser::no_decay_isotopes() const { return no_decay; }
-bool slug_parmParser::use_lamers_loss() const { return lamers_loss; }
-double slug_parmParser::get_lamers_t4() const { return lamers_t4; }
-double slug_parmParser::get_lamers_gamma() const { return lamers_gamma; }
+
+

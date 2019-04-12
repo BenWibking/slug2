@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef _slug_PDF_H_
 #define _slug_PDF_H_
 
+#include <boost/filesystem.hpp>
 #include <boost/random/discrete_distribution.hpp>
 #include <boost/random/uniform_smallint.hpp>
 #include <boost/random/variate_generator.hpp>

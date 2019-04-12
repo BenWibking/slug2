@@ -70,17 +70,17 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
   
   // Either read a random seed from a file, or generate one
   unsigned int seed;
-  if (pp.read_rng_seed()) {
+  if (pp.query<int>("read_seed")) {
 
     // Read seed from file; for MPI runs, only root processor does this
 #ifdef ENABLE_MPI
     if (rank == 0) {
 #endif
       std::ifstream seed_file;
-      string seed_file_name = pp.rng_seed_file();
-      if (pp.get_rng_offset() != 0) {
+      string seed_file_name(pp.fpath("rng_seed_file"));
+      if (pp.query<int>("rng_offset") != 0) {
 	stringstream ss;
-	ss << seed_file_name << "_off_" << pp.get_rng_offset();
+	ss << seed_file_name << "_off_" << pp.query<int>("rng_offset");
 	seed_file_name = ss.str();
       }
       seed_file.open(seed_file_name.c_str(), ios::in);
@@ -133,19 +133,19 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
     }
     // Add offset if requested; this probably isn't necessary if
     // /dev/random worked, but do it anyway in case it failed.
-    seed += pp.get_rng_offset();
+    seed += pp.query<int>("rng_offset");
 
     // Save the rng seed if requested; only root rank does this on MPI
     // jobs
 #ifdef ENABLE_MPI
     if (rank == 0) {
 #endif
-      if (pp.save_rng_seed()) {
+      if (pp.query<int>("save_seed")) {
 	std::ofstream seed_file;
-	string seed_file_name = pp.rng_seed_file();
-	if (pp.get_rng_offset() != 0) {
+	string seed_file_name(pp.fpath("seed_file"));
+	if (pp.query<int>("rng_offset") != 0) {
 	  stringstream ss;
-	  ss << seed_file_name << "_off_" << pp.get_rng_offset();
+	  ss << seed_file_name << "_off_" << pp.query<int>("rng_offset");
 	  seed_file_name = ss.str();
 	}
 	seed_file.open(seed_file_name.c_str(), ios::out);
@@ -166,45 +166,53 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
   boost::random::uniform_int_distribution<> six_sided_die(1,6);
   for (int i=0; i<1000; i++) six_sided_die(*rng);
   
-  // Set up the time stepping
-  out_time_pdf = nullptr;
-  if (!pp.get_random_output_time() && !pp.get_outTimesList()) {
-    double t = pp.get_startTime();
-    while (t <= pp.get_endTime()) {
-      outTimes.push_back(t);
-      if (!pp.get_logTime())
-	t += pp.get_timeStep();
-      else
-	t *= pow(10.0, pp.get_timeStep());
-    }
-  } else if (pp.get_random_output_time()) {
-    out_time_pdf = new slug_PDF(pp.get_outtime_dist(), rng, ostreams);
+  // Set up the time stepping; these can be specified in multiple
+  // ways, which we have to check for
+  if (pp.query<vector<double> >("output_times").size() > 0) {
+    // User has specified exact output times
+    outTimes = pp.query<vector<double> >("output_times");
+    out_time_pdf = nullptr;
+  } else if (pp.query<int>("random_output_times")) {
+    // User has specified a PDF of output times
+    out_time_pdf = new slug_PDF(pp.fpath("output_time_dist"),
+				rng, ostreams);
   } else {
-    outTimes = pp.get_outTimes();
+    // User has specified start time, end time, and time step
+    double t = pp.query<double>("start_time");
+    double dt = pp.query<double>("time_step");
+    double end_time = pp.query<double>("end_time");
+    while (t <= end_time) {
+      outTimes.push_back(t);
+      if (pp.query<int>("log_time")) t *= pow(10., dt);
+      else t += dt;
+    }
+    out_time_pdf = nullptr;
   }
 
   // Set up the photometric filters
-  if (pp.get_nPhot() > 0) {
-    if (pp.get_verbosity() > 1)
+  const vector<string>& phot_bands = pp.query<vector<string> >("phot_bands");
+  if (phot_bands.size() > 0) {
+    if (pp.query<int>("verbosity") > 1)
       ostreams.slug_out_one << "reading filters" << std::endl;
-    filters = new slug_filter_set(pp.get_photBand(), 
-				  pp.get_filter_dir(), 
-				  pp.get_photMode(),
-				  ostreams,
-				  pp.get_atmos_dir());
+    filters = new
+      slug_filter_set(phot_bands, 
+		      pp.fpath("filter_dir"), 
+		      static_cast<photMode>(pp.query<int>("phot_mode")),
+		      ostreams,
+		      pp.fpath("atmospheres"));
   } else {
     filters = nullptr;
   }
 
   // Read the tracks
-  if (pp.get_verbosity() > 1)
+  if (pp.query<int>("verbosity") > 1)
     ostreams.slug_out_one << "reading tracks" << std::endl;
-  switch (pp.get_trackSet()) {
+  switch (static_cast<trackSet>(pp.query<int>("track_set"))) {
   case NO_TRACK_SET: {
     // User has manually specified the file name; decide if it is a
     // starburst99 or MIST file based on its extension; note that
     // MIST files are only usable if we have FITS capability
-    string fname(pp.get_trackFile());
+    string fname(pp.fpath("tracks"));
     size_t pos = fname.find_last_of(".");
     bool mist_ext;
     if (pos == string::npos) {
@@ -217,7 +225,7 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
     if (mist_ext) {
 #ifdef ENABLE_FITS
       tracks = (slug_tracks *)
-	new slug_tracks_mist(pp.get_trackFile(), ostreams);
+	new slug_tracks_mist(pp.fpath("tracks"), ostreams);
 #else
       ostreams.slug_err_one
         << "MIST gzip'ed track files only available if "
@@ -227,7 +235,7 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
 #endif
     } else {
       tracks = (slug_tracks *)
-	new slug_tracks_sb99(pp.get_trackFile(), ostreams);
+	new slug_tracks_sb99(pp.fpath("tracks"), ostreams);
     }
     break;
   }
@@ -239,8 +247,9 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
   case PADOVA_TPAGB_NO: {
     // These are starburst99 track sets
     tracks = (slug_tracks *)
-      new slug_tracks_sb99(pp.get_trackSet(), pp.get_metallicity(),
-			   pp.get_track_dir(), ostreams);
+      new slug_tracks_sb99(static_cast<trackSet>(pp.query<int>("track_set")),
+			   pp.query<double>("metallicity"),
+			   pp.fpath("track_dir"), ostreams);
     break;
   }
 #ifdef ENABLE_FITS
@@ -248,32 +257,35 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
   case MIST_2016_VVCRIT_40: {
     // These are MIST track sets
     tracks = (slug_tracks *)
-      new slug_tracks_mist(pp.get_trackSet(), pp.get_metallicity(),
-			   pp.get_track_dir(), ostreams);
+      new slug_tracks_mist(static_cast<trackSet>(pp.query<int>("track_set")),
+			   pp.query<double>("metallicity"),
+			   pp.fpath("track_dir"), ostreams);
     break;
   }
 #endif
   }
 
   // If we're computing yields, set up yield tables
-  if (pp.get_writeClusterYield() || pp.get_writeIntegratedYield() ||
-      pp.get_writeClusterSN() || pp.get_writeIntegratedSN()) {
-    if (pp.get_verbosity() > 1)
+  if (pp.query<int>("out_cluster_yield") ||
+      pp.query<int>("out_integrated_yield") ||
+      pp.query<int>("out_cluster_sn") ||
+      pp.query<int>("out_integrated_sn")) {
+    if (pp.query<int>("verbosity") > 1)
       ostreams.slug_out_one << "reading yield tables" << std::endl;
-    yields = (slug_yields *)
-      new slug_yields_multiple(pp.get_yield_dir(),
-			       pp.get_yieldMode(),
-			       ((slug_tracks_2d *) tracks)->get_metallicity(),
-			       ostreams,
-			       pp.no_decay_isotopes(),
-			       pp.output_all_isotopes());
+    yields = (slug_yields *) new
+      slug_yields_multiple(pp.fpath("yield_dir"),
+			   static_cast<yieldMode>(pp.query<int>("yield_mode")),
+			   ((slug_tracks_2d *) tracks)->get_metallicity(),
+			   ostreams,
+			   pp.query<int>("no_decay_isotopes"),
+			   pp.query<int>("isotopes_included"));
   } else {
     yields = nullptr;
   }
   
   // Set up the IMF, including the limts on its stochasticity
-  imf = new slug_PDF(pp.get_IMF(), rng, ostreams);
-  imf->set_stoch_lim(pp.get_min_stoch_mass());
+  imf = new slug_PDF(pp.fpath("imf"), rng, ostreams);
+  imf->set_stoch_lim(pp.query<double>("min_stoch_mass"));
 
   // Compare IMF and tracks, and issue warning if IMF extends outside
   // range of tracks
@@ -320,124 +332,129 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
     // Update IMF segments and recompute weights 
     imf_vpdraws = imf->vseg_draw();
     // Reset range restrictions
-    imf->set_stoch_lim(pp.get_min_stoch_mass());
+    imf->set_stoch_lim(pp.query<double>("min_stoch_mass"));
   }
 
+  // Record whether we're running a galaxy simulation or a cluster
+  // simulation
+  sim_type = static_cast<simType>(pp.query<int>("sim_type"));
+
   // Set the cluster lifetime function
-  clf = new slug_PDF(pp.get_CLF(), rng, ostreams);
+  clf = new slug_PDF(pp.fpath("clf"), rng, ostreams);
 
   // Set the cluster mass function
-  if (pp.galaxy_sim() || pp.get_random_cluster_mass())
-    cmf = new slug_PDF(pp.get_CMF(), rng, ostreams);
+  if (sim_type == galaxy_type || pp.query<int>("random_cluster_mass"))
+    cmf = new slug_PDF(pp.fpath("cmf"), rng, ostreams);
   else
     cmf = nullptr;
 
   // Set the star formation history
-  if (!pp.galaxy_sim()) {
+  if (sim_type == cluster_type) {
     sfh = nullptr;
     sfr_pdf = nullptr;
   } else {
-    if (pp.get_constantSFR()) {
+    if (pp.query<int>("constant_sfr")) {
       // SFR is constant, so create a powerlaw segment of slope 0 with
       // the correct normalization
       slug_PDF_powerlaw *sfh_segment = 
 	new slug_PDF_powerlaw(0.0, outTimes.back(), 0.0, rng, ostreams);
       sfh = new slug_PDF(sfh_segment, rng, ostreams,
-			 outTimes.back()*pp.get_SFR());
+			 outTimes.back()*pp.query<double>("sfr"));
       sfr_pdf = nullptr;
-    } else if (pp.get_randomSFR()) {
+    } else if (pp.query<int>("random_sfr")) {
       // SFR is to be drawn from a PDF, so read the PDF, and
       // initialize the SFH from it
-      sfr_pdf = new slug_PDF(pp.get_SFR_file(), rng, ostreams, false);
+      sfr_pdf = new slug_PDF(pp.fpath("sfr"), rng, ostreams, false);
       slug_PDF_powerlaw *sfh_segment = 
 	new slug_PDF_powerlaw(0.0, outTimes.back(), 0.0, rng, ostreams);
       sfh = new slug_PDF(sfh_segment, rng, ostreams,
 			 outTimes.back()*sfr_pdf->draw());
     } else {
       // SFR is not constant, so read SFH from file
-      sfh = new slug_PDF(pp.get_SFH(), rng, ostreams, false);
+      sfh = new slug_PDF(pp.fpath("sfh"), rng, ostreams, false);
       sfr_pdf = nullptr;
     }
   }
 
   // Initialize the spectral synthesizer
-  if (pp.get_verbosity() > 1)
+  if (pp.query<int>("verbosity") > 1)
     ostreams.slug_out_one << "reading atmospheres" << std::endl;
-  if (pp.get_specsynMode() == PLANCK) {
+  double z = pp.query<double>("redshift");
+  if (pp.query<int>("specsyn_mode") == PLANCK) {
     specsyn = static_cast<slug_specsyn *>
-      (new slug_specsyn_planck(tracks, imf, sfh, ostreams, pp.get_z()));
-  } else if (pp.get_specsynMode() == KURUCZ) {
+      (new slug_specsyn_planck(tracks, imf, sfh, ostreams, z));
+  } else if (pp.query<int>("specsyn_mode") == KURUCZ) {
     specsyn = static_cast<slug_specsyn *>
-      (new slug_specsyn_kurucz(pp.get_atmos_dir(), tracks, 
-			       imf, sfh, ostreams, pp.get_z()));
-  } else if (pp.get_specsynMode() == KURUCZ_HILLIER) {
+      (new slug_specsyn_kurucz(pp.fpath("atmospheres"), tracks, 
+			       imf, sfh, ostreams, z));
+  } else if (pp.query<int>("specsyn_mode") == KURUCZ_HILLIER) {
     specsyn = static_cast<slug_specsyn *>
-      (new slug_specsyn_hillier(pp.get_atmos_dir(), tracks, 
-				imf, sfh, ostreams, pp.get_z()));
-  } else if (pp.get_specsynMode() == KURUCZ_PAULDRACH) {
+      (new slug_specsyn_hillier(pp.fpath("atmospheres"), tracks, 
+				imf, sfh, ostreams, z));
+  } else if (pp.query<int>("specsyn_mode") == KURUCZ_PAULDRACH) {
     specsyn = static_cast<slug_specsyn *>
-      (new slug_specsyn_pauldrach(pp.get_atmos_dir(), tracks, 
-				  imf, sfh, ostreams, pp.get_z()));
-  } else if (pp.get_specsynMode() == SB99) {
+      (new slug_specsyn_pauldrach(pp.fpath("atmospheres"), tracks, 
+				  imf, sfh, ostreams, z));
+  } else if (pp.query<int>("specsyn_mode") == SB99) {
     specsyn = static_cast<slug_specsyn *> 
-      (new slug_specsyn_sb99(pp.get_atmos_dir(), tracks,
-			     imf, sfh, ostreams, pp.get_z()));
+      (new slug_specsyn_sb99(pp.fpath("atmospheres"), tracks,
+			     imf, sfh, ostreams, z));
   }
-  else if  (pp.get_specsynMode() == SB99_HRUV) {
+  else if  (pp.query<int>("specsyn_mode") == SB99_HRUV) {
     specsyn = static_cast<slug_specsyn *> 
-      (new slug_specsyn_sb99hruv(pp.get_atmos_dir(), tracks,
-				 imf, sfh, ostreams, pp.get_z()));   
+      (new slug_specsyn_sb99hruv(pp.fpath("atmospheres"), tracks,
+				 imf, sfh, ostreams, z));   
   }
 
   // Load line list for equivalent width calculations
-  if (pp.get_writeClusterEW()) {
-    if (pp.get_verbosity() > 1) {
+  if (pp.query<int>("out_cluster_ew")) {
+    if (pp.query<int>("verbosity") > 1) {
       ostreams.slug_out_one << "reading line list" << std::endl;
     }    
-    lines = new slug_line_list(pp.get_linepicks(),
-			       pp.get_line_dir(),
+    lines = new slug_line_list(pp.query<vector<string> >("spectral_lines"),
+			       pp.fpath("line_dir"),
 			       ostreams);
   } else {
     lines = nullptr;
   }
   
   // If using nebular emission, initialize the computation of that
-  if (pp.get_use_nebular()) {
-    if (pp.get_trackSet() == NO_TRACK_SET) {
+  if (pp.query<int>("compute_nebular")) {
+    if (pp.query<int>("track_set") == NO_TRACK_SET) {
       // User has manually specified a file name
-      nebular = new slug_nebular(pp.get_atomic_dir(),
+      nebular = new slug_nebular(pp.fpath("atomic_data"),
 				 specsyn->lambda(true),
-				 pp.get_trackFile(),
+				 pp.fpath("tracks"),
 				 ostreams,
-				 pp.get_nebular_den(),
-				 pp.get_nebular_temp(),
-				 pp.get_nebular_logU(),
-				 pp.get_nebular_phi(),
-				 pp.get_z(),
-				 pp.nebular_no_metals());
+				 pp.query<double>("nebular_den"),
+				 pp.query<double>("nebular_temp"),
+				 pp.query<double>("nebular_logU"),
+				 pp.query<double>("nebular_phi"),
+				 pp.query<double>("redshift"),
+				 pp.query<int>("nebular_no_metals"));
     } else {
       // User has specified a track set
       nebular
-	= new slug_nebular(pp.get_atomic_dir(),
+	= new slug_nebular(pp.fpath("atomic_data"),
 			   specsyn->lambda(true),
 			   ((slug_tracks_2d *) tracks)->get_metallicity(),
 			   ((slug_tracks_2d *) tracks)->trackset_filenames(),
 			   ((slug_tracks_2d *) tracks)->trackset_metallicities(),
 			   ((slug_tracks_2d *) tracks)->trackset_Z_int_meth(),
 			   ostreams,
-			   pp.get_nebular_den(),
-			   pp.get_nebular_temp(),
-			   pp.get_nebular_logU(),
-			   pp.get_nebular_phi(),
-			   pp.get_z(),
-			   pp.nebular_no_metals());
+			   pp.query<double>("nebular_den"),
+			   pp.query<double>("nebular_temp"),
+			   pp.query<double>("nebular_logU"),
+			   pp.query<double>("nebular_phi"),
+			   pp.query<double>("redshift"),
+			   pp.query<int>("nebular_no_metals"));
     }
   } else {
     nebular = nullptr;
   }
 
   // If using extinction, initialize the extinction curve
-  if (pp.get_use_extinct()) {
+  if (pp.query<int>("use_extinct")) {
     if (nebular != nullptr)
       extinct = new slug_extinction(pp, specsyn->lambda(true),
 				    nebular->lambda(), rng, ostreams);
@@ -450,17 +467,17 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
 
   // Initialize either a galaxy or a single cluster, depending on
   // which type of simulation we're running
-  if (pp.galaxy_sim()) {
+  if (sim_type == galaxy_type) {
     galaxy = new slug_galaxy(pp, imf, cmf, clf, sfh, tracks, 
 			     specsyn, filters, extinct, nebular, 
 			     yields, ostreams);
     cluster = nullptr;
   } else {
     double cluster_mass;
-    if (pp.get_random_cluster_mass())
+    if (pp.query<int>("random_cluster_mass"))
       cluster_mass = cmf->draw();
     else
-      cluster_mass = pp.get_cluster_mass();
+      cluster_mass = pp.query<double>("cluster_mass");
     cluster = new slug_cluster(0, cluster_mass, 0.0, imf,
     			       tracks, specsyn, filters,
     			       extinct, nebular, yields,
@@ -469,8 +486,8 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
   }
 
   // Record the output mode and set the checkpoint counter
-  out_mode = pp.get_outputMode();
-  if (pp.get_checkpoint_interval() == 0)
+  out_mode = (outputMode) pp.query<int>("output_mode");
+  if (pp.query<int>("checkpoint_interval") == 0)
     checkpoint_ctr = -1; // Indicate no checkpointing
   else
     checkpoint_ctr = pp.get_checkpoint_ctr();  
@@ -509,22 +526,22 @@ slug_sim::~slug_sim() {
 // Methods to open and close output files
 ////////////////////////////////////////////////////////////////////////
 void slug_sim::open_output(slug_output_files &outfiles, int chknum) {
-  if (pp.galaxy_sim() && pp.get_writeIntegratedProp())
+  if (sim_type == galaxy_type && pp.query<int>("out_integrated"))
     open_integrated_prop(outfiles, chknum);
-  if (pp.galaxy_sim() && pp.get_writeIntegratedSpec()) 
+  if (sim_type == galaxy_type && pp.query<int>("out_integrated_spec")) 
     open_integrated_spec(outfiles, chknum);
-  if (pp.galaxy_sim() && pp.get_writeIntegratedPhot()) 
+  if (sim_type == galaxy_type && pp.query<int>("out_integrated_phot")) 
     open_integrated_phot(outfiles, chknum);
-  if (pp.galaxy_sim() && pp.get_writeIntegratedYield())
+  if (sim_type == galaxy_type && pp.query<int>("out_integrated_yield"))
     open_integrated_yield(outfiles, chknum);
-  if (pp.galaxy_sim() && pp.get_writeIntegratedSN())
+  if (sim_type == galaxy_type && pp.query<int>("out_integrated_sn"))
     open_integrated_sn(outfiles, chknum);
-  if (pp.get_writeClusterProp()) open_cluster_prop(outfiles, chknum);
-  if (pp.get_writeClusterPhot()) open_cluster_phot(outfiles, chknum);
-  if (pp.get_writeClusterSpec()) open_cluster_spec(outfiles, chknum);
-  if (pp.get_writeClusterYield()) open_cluster_yield(outfiles, chknum);
-  if (pp.get_writeClusterSN()) open_cluster_sn(outfiles, chknum);
-  if (pp.get_writeClusterEW()) open_cluster_ew(outfiles, chknum);
+  if (pp.query<int>("out_cluster")) open_cluster_prop(outfiles, chknum);
+  if (pp.query<int>("out_cluster_phot")) open_cluster_phot(outfiles, chknum);
+  if (pp.query<int>("out_cluster_spec")) open_cluster_spec(outfiles, chknum);
+  if (pp.query<int>("out_cluster_yield")) open_cluster_yield(outfiles, chknum);
+  if (pp.query<int>("out_cluster_sn")) open_cluster_sn(outfiles, chknum);
+  if (pp.query<int>("out_cluster_ew")) open_cluster_ew(outfiles, chknum);
   outfiles.is_open = true;
 }
 
@@ -675,7 +692,7 @@ void slug_sim::galaxy_sim() {
   // Prepare to count trials; in serial mode this is trivial, while in
   // MPI mode we need to set up a remote access window so that we can
   // synchronize trial counts across processes
-  unsigned long trials_to_do = pp.get_nTrials();
+  unsigned long trials_to_do = pp.query<int>("n_trials");
   unsigned long trial_ctr = pp.get_checkpoint_trials();
   unsigned long trial_ctr_loc = 0; // Counts trials on this processor
   unsigned long trial_ctr_last = 1; // Trial counter at last write
@@ -696,6 +713,8 @@ void slug_sim::galaxy_sim() {
 
   // Initialize output file information
   slug_output_files outfiles;
+  vector<string>::size_type nphot =
+    pp.query<vector<string> >("phot_bands").size();
   
   // Main loop
   while (true) {
@@ -726,8 +745,8 @@ void slug_sim::galaxy_sim() {
     if (trial_ctr_loc == 1) {
       // Always open new file on first trial
       open_new_output = true;
-    } else if (pp.get_checkpoint_interval() != 0) {
-      if ((trial_ctr_loc-1) % pp.get_checkpoint_interval() == 0) {
+    } else if (pp.query<int>("checkpoint_interval") != 0) {
+      if ((trial_ctr_loc-1) % pp.query<int>("checkpoint_interval") == 0) {
 	// Create a new checkpoint at periodic intervals if we are
 	// checkpointing
 	open_new_output = true;
@@ -737,7 +756,7 @@ void slug_sim::galaxy_sim() {
     // If we are opening new outputs, do so now
     if (open_new_output) {
       // Write status message
-      if (pp.get_verbosity() > 0 &&
+      if (pp.query<int>("verbosity") > 0 &&
 	  checkpoint_ctr > 0 &&
 	  trial_ctr_loc != 1)
 	ostreams.slug_out << "finalizing checkpoint "
@@ -757,7 +776,7 @@ void slug_sim::galaxy_sim() {
     }
 
     // If sufficiently verbose, print status
-    if (pp.get_verbosity() > 0)
+    if (pp.query<int>("verbosity") > 0)
 #if defined(ENABLE_MPI) && !(MPI_VERSION == 1 || MPI_VERSION == 2)
       ostreams.slug_out << " starting trial " << trial_ctr << " of "
 			<< trials_to_do << endl;
@@ -772,7 +791,7 @@ void slug_sim::galaxy_sim() {
       // Update IMF segments and recompute weights 
       imf_vpdraws = imf->vseg_draw();
       // Reset range restrictions
-      imf->set_stoch_lim(pp.get_min_stoch_mass());
+      imf->set_stoch_lim(pp.query<double>("get_min_stoch_mass"));
     }
 
     // Reset the galaxy
@@ -783,13 +802,13 @@ void slug_sim::galaxy_sim() {
     if ((out_mode == ASCII) && !open_new_output) {
 	
       // Skip if we just opened new files
-      if (pp.get_checkpoint_interval() > 0) {
-	if (((trial_ctr_loc-1) % pp.get_checkpoint_interval() == 0) &&
+      if (pp.query<int>("checkpoint_interval") > 0) {
+	if (((trial_ctr_loc-1) % pp.query<int>("checkpoint_interval") == 0) &&
 	    (trial_ctr_loc != 1))
 	  break;
       }
       
-      if (pp.get_writeIntegratedProp()) { 
+      if (pp.query<int>("out_integrated")) { 
         // Write separators
         int ncol = 9*14-3;      
 	if (is_imf_var==true) ncol += (imf_vpdraws.size())*14;
@@ -806,37 +825,37 @@ void slug_sim::galaxy_sim() {
       }
       // Add on IMF fields
       if (is_imf_var==true) extrafields += (imf_vpdraws.size());
-      if (pp.get_writeIntegratedSpec()) 
+      if (pp.query<int>("out_integrated_spec")) 
 	write_separator(outfiles.int_spec_file, (2+nfield)*14-3);
-      if (pp.get_writeIntegratedPhot())
+      if (pp.query<int>("out_integrated_phot"))
 	write_separator(outfiles.int_phot_file,
-			(1+nfield*pp.get_nPhot())*21-3);
-      if (pp.get_writeIntegratedSN())
+			(1+nfield*nphot)*21-3);
+      if (pp.query<int>("out_integrated_sn"))
 	write_separator(outfiles.int_sn_file, 14*3-3);
-      if (pp.get_writeIntegratedYield())
+      if (pp.query<int>("out_integrated_yield"))
 	write_separator(outfiles.int_yield_file, 14*5-3);
-      if (pp.get_writeClusterProp())
+      if (pp.query<int>("out_cluster"))
 	write_separator(outfiles.cluster_prop_file, (10+extrafields)*14-3);
-      if (pp.get_writeClusterSpec())
+      if (pp.query<int>("out_cluster_spec"))
 	write_separator(outfiles.cluster_spec_file, (4+nfield)*14-3);
-      if (pp.get_writeClusterPhot())
+      if (pp.query<int>("out_cluster_phot"))
 	write_separator(outfiles.cluster_phot_file,
-			(2+nfield*pp.get_nPhot())*21-3);
-      if (pp.get_writeClusterSN())
+			(2+nfield*nphot)*21-3);
+      if (pp.query<int>("out_cluster_sn"))
 	write_separator(outfiles.cluster_sn_file, 14*4-3);
-      if (pp.get_writeClusterYield())
+      if (pp.query<int>("out_cluster_yield"))
 	write_separator(outfiles.cluster_yield_file, 14*6-3);
     }
 
     // If the output time is randomly changing, draw a new output time
     // for this trial
-    if (pp.get_random_output_time()) {
+    if (pp.query<int>("random_output_times")) {
       outTimes.resize(0);
       outTimes.push_back(out_time_pdf->draw());
     }
 
     // If the SFR is randomly changing, draw a new SFR for this trial
-    if (pp.get_randomSFR()) {
+    if (pp.query<int>("random_sfr")) {
       double sfr = sfr_pdf->draw();
       sfh->setNorm(outTimes.back()*sfr);
     }
@@ -846,11 +865,11 @@ void slug_sim::galaxy_sim() {
 
       // Flag if we should delete clusters on this pass
       bool del_cluster = (j==outTimes.size()-1) &&
-	(!pp.get_writeClusterSpec()) && (!pp.get_writeClusterPhot()) &&
-	(!pp.get_writeClusterYield());
+	(!pp.query<int>("out_cluster_spec")) && (!pp.query<int>("out_cluster_phot")) &&
+	(!pp.query<int>("out_cluster_yield"));
 
       // If sufficiently verbose, print status
-      if (pp.get_verbosity() > 1)
+      if (pp.query<int>("verbosity") > 1)
 	ostreams.slug_out << "  trial " << trial_ctr << ", advance to time " 
 			  << outTimes[j] << std::endl;
       
@@ -858,7 +877,7 @@ void slug_sim::galaxy_sim() {
       galaxy->advance(outTimes[j]);
 
       // Write physical properties if requested
-      if (pp.get_writeIntegratedProp()) {
+      if (pp.query<int>("out_integrated")) {
 #ifdef ENABLE_FITS
 	if (out_mode != FITS) {
 #endif
@@ -871,7 +890,7 @@ void slug_sim::galaxy_sim() {
 	}
 #endif
       }
-      if (pp.get_writeClusterProp()) {
+      if (pp.query<int>("out_cluster")) {
 #ifdef ENABLE_FITS
 	if (out_mode != FITS) {
 #endif
@@ -886,7 +905,7 @@ void slug_sim::galaxy_sim() {
       }
 
       // Write yield if requested
-      if (pp.get_writeIntegratedYield()) {
+      if (pp.query<int>("out_integrated_yield")) {
 #ifdef ENABLE_FITS
 	if (out_mode != FITS) {
 #endif
@@ -899,7 +918,7 @@ void slug_sim::galaxy_sim() {
 	}
 #endif
       }
-      if (pp.get_writeClusterYield()) {
+      if (pp.query<int>("out_cluster_yield")) {
 #ifdef ENABLE_FITS
 	if (out_mode != FITS) {
 #endif
@@ -914,7 +933,7 @@ void slug_sim::galaxy_sim() {
       }
 
       // Write supernova count if requested
-      if (pp.get_writeIntegratedSN()) {
+      if (pp.query<int>("out_integrated_sn")) {
 #ifdef ENABLE_FITS
 	if (out_mode != FITS) {
 #endif
@@ -927,7 +946,7 @@ void slug_sim::galaxy_sim() {
 	}
 #endif
       }
-      if (pp.get_writeClusterSN()) {
+      if (pp.query<int>("out_cluster_sn")) {
 #ifdef ENABLE_FITS
 	if (out_mode != FITS) {
 #endif
@@ -942,7 +961,7 @@ void slug_sim::galaxy_sim() {
       }
 
       // Write spectra if requested
-      if (pp.get_writeIntegratedSpec()) {
+      if (pp.query<int>("out_integrated_spec")) {
 #ifdef ENABLE_FITS
 	if (out_mode != FITS) {
 #endif
@@ -955,7 +974,7 @@ void slug_sim::galaxy_sim() {
 	}
 #endif
       }
-      if (pp.get_writeClusterSpec()) {
+      if (pp.query<int>("out_cluster_spec")) {
 #ifdef ENABLE_FITS
 	if (out_mode != FITS) {
 #endif
@@ -970,7 +989,7 @@ void slug_sim::galaxy_sim() {
       }
       
       // Write photometry if requested
-      if (pp.get_writeIntegratedPhot()) {
+      if (pp.query<int>("out_integrated_phot")) {
 #ifdef ENABLE_FITS
 	if (out_mode != FITS) {
 #endif
@@ -983,7 +1002,7 @@ void slug_sim::galaxy_sim() {
 	}
 #endif
       }
-      if (pp.get_writeClusterPhot()) {
+      if (pp.query<int>("out_cluster_phot")) {
 #ifdef ENABLE_FITS
 	if (out_mode != FITS) {
 #endif
@@ -1000,7 +1019,7 @@ void slug_sim::galaxy_sim() {
   }
   
   // Close last output file
-  if ((pp.get_verbosity() > 0) && (trial_ctr_loc - trial_ctr_last > 0) &&
+  if ((pp.query<int>("verbosity") > 0) && (trial_ctr_loc - trial_ctr_last > 0) &&
       (checkpoint_ctr > 0))
     ostreams.slug_out << "finalizing checkpoint "
 		      << checkpoint_ctr << std::endl;
@@ -1026,7 +1045,7 @@ void slug_sim::cluster_sim() {
   // Prepare to count trials; in serial mode this is trivial, while in
   // MPI mode we need to set up a remote access window so that we can
   // synchronize trial counts across processes
-  unsigned long trials_to_do = pp.get_nTrials();
+  unsigned long trials_to_do = pp.query<int>("n_trials");
   unsigned long trial_ctr = pp.get_checkpoint_trials();
   unsigned long trial_ctr_loc = 0; // Counts trials on this processor
   unsigned long trial_ctr_last = 1; // Trial counter at last write
@@ -1054,6 +1073,8 @@ void slug_sim::cluster_sim() {
     = outfiles.cluster_spec_fits = outfiles.cluster_phot_fits
     = outfiles.cluster_yield_fits = outfiles.cluster_ew_fits= nullptr;
 #endif
+  vector<string>::size_type nphot =
+    pp.query<vector<string> >("phot_bands").size();
   
   // Loop over trials
   unsigned long id = 0;
@@ -1084,8 +1105,8 @@ void slug_sim::cluster_sim() {
     if (trial_ctr_loc == 1) {
       // Always open new file on first trial
       open_new_output = true;
-    } else if (pp.get_checkpoint_interval() != 0) {
-      if ((trial_ctr_loc-1) % pp.get_checkpoint_interval() == 0) {
+    } else if (pp.query<int>("checkpoint_interval") != 0) {
+      if ((trial_ctr_loc-1) % pp.query<int>("checkpoint_interval") == 0) {
 	// Create a new checkpoint at periodic intervals if we are
 	// checkpointing
 	open_new_output = true;
@@ -1095,7 +1116,7 @@ void slug_sim::cluster_sim() {
     // Open a new output file if we need to
     if (open_new_output) {
       // Write status message
-      if (pp.get_verbosity() > 0 && checkpoint_ctr > 0 &&
+      if (pp.query<int>("verbosity") > 0 && checkpoint_ctr > 0 &&
 	  trial_ctr_loc != 1)
 	ostreams.slug_out << "finalizing checkpoint "
 			  << checkpoint_ctr << std::endl;
@@ -1115,13 +1136,13 @@ void slug_sim::cluster_sim() {
     }
 	
     // If sufficiently verbose, print status
-    if (pp.get_verbosity() > 0)
+    if (pp.query<int>("verbosity") > 0)
       ostreams.slug_out << "starting trial " << trial_ctr << " of "
 			<< trials_to_do << std::endl;
     
     // If the output time is randomly changing, draw a new output time
     // for this trial
-    if (pp.get_random_output_time()) {
+    if (pp.query<int>("random_output_times")) {
       outTimes.resize(0);
       outTimes.push_back(out_time_pdf->draw());
     }
@@ -1132,25 +1153,25 @@ void slug_sim::cluster_sim() {
       // Update IMF segments and recompute weights 
       imf_vpdraws = imf->vseg_draw();
       // Reset range restrictions
-      imf->set_stoch_lim(pp.get_min_stoch_mass());
+      imf->set_stoch_lim(pp.query<double>("min_stoch_mass"));
     }
     
     // Reset the cluster if the mass is constant, destroy it and build
     // a new one if not
-    if (pp.get_random_cluster_mass()) {
+    if (pp.query<int>("random_cluster_mass")) {
       if (cluster) {
 	id = cluster->get_id();
 	delete cluster;
 	cluster = nullptr;
       }
       double m_cl = cmf->draw();
-      if (pp.use_lamers_loss()) {
-	double lgamma = pp.get_lamers_gamma();
-	double t4 = pp.get_lamers_t4();
+      if (pp.query<int>("lamers_loss")) {
+	double lgamma = pp.query<double>("lamers_gamma");
+	double t4 = pp.query<double>("lamers_t4");
 	double fac = lgamma*pow(1.0e4/m_cl, lgamma)*outTimes.back()/t4;
 	if (fac > 1.0) {
 	  // Cluster gone completely, end trial
-	  if (pp.get_verbosity() > 1) {
+	  if (pp.query<int>("verbosity") > 1) {
 	    ostreams.slug_out << "  Lamers evaporation removed cluster"
 			      << ", ending trial" << endl;
 	  }
@@ -1168,20 +1189,21 @@ void slug_sim::cluster_sim() {
     // Write trial separator to ASCII files if operating in ASCII
     // mode
     if ((out_mode == ASCII) && !open_new_output) {
-      if (pp.get_writeClusterProp()) {
+      if (pp.query<int>("out_cluster")) {
 	int ncol = 10*14-3;
-	if (pp.get_use_extinct()) ncol += 14;
-	if (pp.get_use_extinct() && pp.get_use_neb_extinct()) ncol += 14;
+	if (pp.query<int>("use_extinct")) ncol += 14;
+	if (pp.query<int>("use_extinct") &&
+	    pp.query<int>("use_nebular_extinction")) ncol += 14;
 	if (is_imf_var==true) ncol += (imf_vpdraws.size())*14;
 	write_separator(outfiles.cluster_prop_file, ncol);
       }
-      if (pp.get_writeClusterSpec())
+      if (pp.query<int>("out_cluster_spec"))
 	write_separator(outfiles.cluster_spec_file, 4*14-3);
-      if (pp.get_writeClusterPhot())
-	write_separator(outfiles.cluster_phot_file, (2+pp.get_nPhot())*21-3);
-      if (pp.get_writeClusterYield())
+      if (pp.query<int>("out_cluster_phot"))
+	write_separator(outfiles.cluster_phot_file, (2+nphot)*21-3);
+      if (pp.query<int>("out_cluster_yield"))
 	write_separator(outfiles.cluster_yield_file, 5*14-3);
-      if (pp.get_writeClusterSN())
+      if (pp.query<int>("out_cluster_sn"))
 	write_separator(outfiles.cluster_sn_file, 4*14-3);
     }
     
@@ -1189,7 +1211,7 @@ void slug_sim::cluster_sim() {
     for (unsigned int j=0; j<outTimes.size(); j++) {
 
       // If sufficiently verbose, print status
-      if (pp.get_verbosity() > 1)
+      if (pp.query<int>("verbosity") > 1)
 	ostreams.slug_out << "  trial " << trial_ctr
 			  << ", advance to time " 
 			  << outTimes[j] << std::endl;
@@ -1199,14 +1221,14 @@ void slug_sim::cluster_sim() {
 
       // See if cluster has disrupted; if so, terminate this iteration
       if (cluster->disrupted()) {
-	if (pp.get_verbosity() > 1)
+	if (pp.query<int>("verbosity") > 1)
 	  ostreams.slug_out << "  cluster disrupted, terminating trial"
 			    << std::endl;
 	break;
       }
 
       // Write physical properties if requested
-      if (pp.get_writeClusterProp()) {
+      if (pp.query<int>("out_cluster")) {
 #ifdef ENABLE_FITS
 	if (out_mode != FITS) {
 #endif
@@ -1222,7 +1244,7 @@ void slug_sim::cluster_sim() {
       }
 
       // Write spectrum if requested
-      if (pp.get_writeClusterSpec()) { 
+      if (pp.query<int>("out_cluster_spec")) { 
 #ifdef ENABLE_FITS
 	if (out_mode != FITS) {
 #endif
@@ -1236,13 +1258,13 @@ void slug_sim::cluster_sim() {
       }
 #ifdef ENABLE_FITS    
     // Write equivalent width if requested
-    if (pp.get_writeClusterEW()) {
+    if (pp.query<int>("out_cluster_ew")) {
       cluster->write_ew(outfiles.cluster_ew_fits, trial_ctr_loc);
     }
 #endif
 
       // Write photometry if requested
-      if (pp.get_writeClusterPhot()) {
+      if (pp.query<int>("out_cluster_phot")) {
 #ifdef ENABLE_FITS
 	if (out_mode != FITS) {
 #endif
@@ -1256,7 +1278,7 @@ void slug_sim::cluster_sim() {
       }
 
       // Write yields if requested
-      if (pp.get_writeClusterYield()) {
+      if (pp.query<int>("out_cluster_yield")) {
 #ifdef ENABLE_FITS
 	if (out_mode != FITS) {
 #endif
@@ -1270,7 +1292,7 @@ void slug_sim::cluster_sim() {
       }
 
       // Write supernova counts if requested
-      if (pp.get_writeClusterSN()) {
+      if (pp.query<int>("out_cluster_sn")) {
 #ifdef ENABLE_FITS
 	if (out_mode != FITS) {
 #endif
@@ -1286,7 +1308,8 @@ void slug_sim::cluster_sim() {
   }
 
   // Close last output file
-  if ((pp.get_verbosity() > 0) && (trial_ctr_loc - trial_ctr_last > 0) &&
+  if ((pp.query<int>("verbosity") > 0) &&
+      (trial_ctr_loc - trial_ctr_last > 0) &&
       (checkpoint_ctr > 0))
     ostreams.slug_out << "finalizing checkpoint "
 		      << checkpoint_ctr << std::endl;
@@ -1311,7 +1334,7 @@ void slug_sim::open_integrated_prop(slug_output_files &outfiles,
 				    int chknum) {
 
   // Construct file name and path
-  string fname(pp.get_modelName());
+  string fname(pp.query<string>("model_name"));
 #if defined(ENABLE_MPI) && !(MPI_VERSION == 1 || MPI_VERSION == 2)
   if (comm != MPI_COMM_NULL) {
     ostringstream ss;
@@ -1325,7 +1348,7 @@ void slug_sim::open_integrated_prop(slug_output_files &outfiles,
     fname += ss.str();
   }
   fname += "_integrated_prop";
-  path full_path(pp.get_outDir());
+  path full_path(pp.query<string>("out_dir"));
   if (out_mode == ASCII) {
     fname += ".txt";
     full_path /= fname;
@@ -1518,7 +1541,7 @@ void slug_sim::open_cluster_prop(slug_output_files &outfiles,
 				 int chknum) {
 
   // Construct file name and path
-  string fname(pp.get_modelName());
+  string fname(pp.query<string>("model_name"));
 #if defined(ENABLE_MPI) && !(MPI_VERSION == 1 || MPI_VERSION == 2)
   if (comm != MPI_COMM_NULL) {
     ostringstream ss;
@@ -1532,7 +1555,7 @@ void slug_sim::open_cluster_prop(slug_output_files &outfiles,
     fname += ss.str();
   }
   fname += "_cluster_prop";
-  path full_path(pp.get_outDir());
+  path full_path(pp.query<string>("out_dir"));
   if (out_mode == ASCII) {
     fname += ".txt";
     full_path /= fname;
@@ -1786,7 +1809,7 @@ void slug_sim::open_integrated_spec(slug_output_files &outfiles,
 				    int chknum) {
 
   // Construct file name and path
-  string fname(pp.get_modelName());
+  string fname(pp.query<string>("model_name"));
 #if defined(ENABLE_MPI) && !(MPI_VERSION == 1 || MPI_VERSION == 2)
   if (comm != MPI_COMM_NULL) {
     ostringstream ss;
@@ -1800,7 +1823,7 @@ void slug_sim::open_integrated_spec(slug_output_files &outfiles,
     fname += ss.str();
   }
   fname += "_integrated_spec";
-  path full_path(pp.get_outDir());
+  path full_path(pp.query<string>("out_dir"));
   if (out_mode == ASCII) {
     fname += ".txt";
     full_path /= fname;
@@ -2056,7 +2079,7 @@ void slug_sim::open_cluster_spec(slug_output_files &outfiles,
 				 int chknum) {
 
   // Construct file name and path
-  string fname(pp.get_modelName());
+  string fname(pp.query<string>("model_name"));
 #if defined(ENABLE_MPI) && !(MPI_VERSION == 1 || MPI_VERSION == 2)
   if (comm != MPI_COMM_NULL) {
     ostringstream ss;
@@ -2070,7 +2093,7 @@ void slug_sim::open_cluster_spec(slug_output_files &outfiles,
     fname += ss.str();
   }
   fname += "_cluster_spec";
-  path full_path(pp.get_outDir());
+  path full_path(pp.query<string>("out_dir"));
   if (out_mode == ASCII) {
     fname += ".txt";
     full_path /= fname;
@@ -2363,7 +2386,7 @@ void slug_sim::open_integrated_phot(slug_output_files &outfiles,
 				    int chknum) {
 
   // Construct file name and path
-  string fname(pp.get_modelName());
+  string fname(pp.query<string>("model_name"));
 #if defined(ENABLE_MPI) && !(MPI_VERSION == 1 || MPI_VERSION == 2)
   if (comm != MPI_COMM_NULL) {
     ostringstream ss;
@@ -2377,7 +2400,7 @@ void slug_sim::open_integrated_phot(slug_output_files &outfiles,
     fname += ss.str();
   }
   fname += "_integrated_phot";
-  path full_path(pp.get_outDir());
+  path full_path(pp.query<string>("out_dir"));
   if (out_mode == ASCII) {
     fname += ".txt";
     full_path /= fname;
@@ -2574,7 +2597,7 @@ void slug_sim::open_cluster_phot(slug_output_files &outfiles,
 				 int chknum) {
 
   // Construct file name and path
-  string fname(pp.get_modelName());
+  string fname(pp.query<string>("model_name"));
 #if defined(ENABLE_MPI) && !(MPI_VERSION == 1 || MPI_VERSION == 2)
   if (comm != MPI_COMM_NULL) {
     ostringstream ss;
@@ -2588,7 +2611,7 @@ void slug_sim::open_cluster_phot(slug_output_files &outfiles,
     fname += ss.str();
   }
   fname += "_cluster_phot";
-  path full_path(pp.get_outDir());
+  path full_path(pp.query<string>("out_dir"));
   if (out_mode == ASCII) {
     fname += ".txt";
     full_path /= fname;
@@ -2790,7 +2813,7 @@ void slug_sim::open_cluster_ew(slug_output_files &outfiles,
 {
 
   // Construct file name and path
-  string fname(pp.get_modelName());
+  string fname(pp.query<string>("model_name"));
 #if defined(ENABLE_MPI) && !(MPI_VERSION == 1 || MPI_VERSION == 2)
   if (comm != MPI_COMM_NULL) 
   {
@@ -2806,7 +2829,7 @@ void slug_sim::open_cluster_ew(slug_output_files &outfiles,
     fname += ss.str();
   }
   fname += "_cluster_ew";
-  path full_path(pp.get_outDir());
+  path full_path(pp.query<string>("out_dir"));
   
 #ifdef ENABLE_FITS
   if (out_mode == FITS) 
@@ -2883,7 +2906,7 @@ void slug_sim::open_integrated_sn(slug_output_files &outfiles,
 				  int chknum) {
 
   // Construct file name and path
-  string fname(pp.get_modelName());
+  string fname(pp.query<string>("model_name"));
 #if defined(ENABLE_MPI) && !(MPI_VERSION == 1 || MPI_VERSION == 2)
   if (comm != MPI_COMM_NULL) {
     ostringstream ss;
@@ -2897,7 +2920,7 @@ void slug_sim::open_integrated_sn(slug_output_files &outfiles,
     fname += ss.str();
   }
   fname += "_integrated_sn";
-  path full_path(pp.get_outDir());
+  path full_path(pp.query<string>("out_dir"));
   if (out_mode == ASCII) {
     fname += ".txt";
     full_path /= fname;
@@ -3023,7 +3046,7 @@ void slug_sim::open_cluster_sn(slug_output_files &outfiles,
 			       int chknum) {
 
   // Construct file name and path
-  string fname(pp.get_modelName());
+  string fname(pp.query<string>("model_name"));
 #if defined(ENABLE_MPI) && !(MPI_VERSION == 1 || MPI_VERSION == 2)
   if (comm != MPI_COMM_NULL) {
     ostringstream ss;
@@ -3037,7 +3060,7 @@ void slug_sim::open_cluster_sn(slug_output_files &outfiles,
     fname += ss.str();
   }
   fname += "_cluster_sn";
-  path full_path(pp.get_outDir());
+  path full_path(pp.query<string>("out_dir"));
   if (out_mode == ASCII) {
     fname += ".txt";
     full_path /= fname;
@@ -3159,7 +3182,7 @@ void slug_sim::open_integrated_yield(slug_output_files &outfiles,
 				     int chknum) {
 
   // Construct file name and path
-  string fname(pp.get_modelName());
+  string fname(pp.query<string>("model_name"));
 #if defined(ENABLE_MPI) && !(MPI_VERSION == 1 || MPI_VERSION == 2)
   if (comm != MPI_COMM_NULL) {
     ostringstream ss;
@@ -3173,7 +3196,7 @@ void slug_sim::open_integrated_yield(slug_output_files &outfiles,
     fname += ss.str();
   }
   fname += "_integrated_yield";
-  path full_path(pp.get_outDir());
+  path full_path(pp.query<string>("out_dir"));
   if (out_mode == ASCII) {
     fname += ".txt";
     full_path /= fname;
@@ -3361,7 +3384,7 @@ void slug_sim::open_cluster_yield(slug_output_files &outfiles,
 				  int chknum) {
 
   // Construct file name and path
-  string fname(pp.get_modelName());
+  string fname(pp.query<string>("model_name"));
 #if defined(ENABLE_MPI) && !(MPI_VERSION == 1 || MPI_VERSION == 2)
   if (comm != MPI_COMM_NULL) {
     ostringstream ss;
@@ -3375,7 +3398,7 @@ void slug_sim::open_cluster_yield(slug_output_files &outfiles,
     fname += ss.str();
   }
   fname += "_cluster_yield";
-  path full_path(pp.get_outDir());
+  path full_path(pp.query<string>("out_dir"));
   if (out_mode == ASCII) {
     fname += ".txt";
     full_path /= fname;
