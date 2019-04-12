@@ -366,7 +366,6 @@ slug_parmParser::parseFile(std::ifstream &paramFile) {
 	if (tokens[1].compare("sfh") == 0) {
 	  keywords["constant_sfr"] = false;
 	  keywords["random_sfr"] = false;
-	  filepaths["sfh"] = path(tokens[1]);
 	} else {
 	  try {
 	    // See if the SFR is a number, indicating a constant SFR
@@ -630,6 +629,8 @@ slug_parmParser::parseFile(std::ifstream &paramFile) {
     keywords["random_cluster_mass"] = true;
   if (keywords.find("constant_sfr") == keywords.end())
     keywords["constant_sfr"] = true;
+  if (keywords.find("random_sfr") == keywords.end())
+    keywords["random_sfr"] = false;  
 
   // Initialise file paths from keywords
   if (query<string>("rng_seed_file").length() > 0)
@@ -641,6 +642,7 @@ slug_parmParser::parseFile(std::ifstream &paramFile) {
   filepaths["imf"] = path(query<string>("imf"));
   filepaths["cmf"] = path(query<string>("cmf"));
   filepaths["clf"] = path(query<string>("clf"));
+  filepaths["sfh"] = path(query<string>("sfh"));
   filepaths["atmospheres"] = path(query<string>("atmospheres"));
   filepaths["extinction_curve"] = path(query<string>("extinction_curve"));
   filepaths["atomic_data"] = path(query<string>("atomic_data"));
