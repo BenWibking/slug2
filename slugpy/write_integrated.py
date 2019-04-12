@@ -692,10 +692,18 @@ def write_integrated(data, model_name, fmt):
 
             # Write number of filters and filter names as ASCII
             nf = len(data.filter_names)
-            fp.write(str(nf)+"\n")
-            for i in range(nf):
-                fp.write(data.filter_names[i] + " " + 
-                         data.filter_units[i] + "\n")
+            if sys.version_info < (3,):
+                # Python 2 version
+                fp.write(str(nf)+"\n")
+                for i in range(nf):
+                    fp.write(data.filter_names[i] + " " + 
+                             data.filter_units[i] + "\n")
+            else:
+                # Python 3 version
+                fp.write((str(nf)+"\n").encode())
+                for i in range(nf):
+                    fp.write((data.filter_names[i] + " " + 
+                              data.filter_units[i] + "\n").encode())
 
             # Write out bytes indicating nebular or no nebular, and
             # extinction or no extinction
@@ -893,6 +901,8 @@ def write_integrated(data, model_name, fmt):
             # Close file
             fp.close()
                     
+        elif fmt == 'fits':
+            
             ########################################################
             # FITS mode
             ########################################################
@@ -926,7 +936,7 @@ def write_integrated(data, model_name, fmt):
 
             # Create HDU list and write file
             prihdu = fits.PrimaryHDU()
-            hdulist = fits.HDUList([prihdu, sn_hdu])
+            hdulist = fits.HDUList([prihdu, snhdu])
             hdulist.writeto(model_name+'_integrated_sn.fits',
                             clobber=True)
             
@@ -995,13 +1005,24 @@ def write_integrated(data, model_name, fmt):
             fp.write(np.uint64(data.isotope_name.size))
             for i in range(data.isotope_name.size):
                 tempstr = "{:<4s}".format(data.isotope_name[i])
-                fp.write(struct.pack('ccccII',
-                                     tempstr[0],
-                                     tempstr[1],
-                                     tempstr[2],
-                                     tempstr[3],
-                                     data.isotope_Z[i],
-                                     data.isotope_A[i]))
+                if sys.version_info < (3,):
+                    # Python 2 version
+                    fp.write(struct.pack('ccccII',
+                                         tempstr[0],
+                                         tempstr[1],
+                                         tempstr[2],
+                                         tempstr[3],
+                                         data.isotope_Z[i],
+                                         data.isotope_A[i]))
+                else:
+                    # Python 3 version
+                    fp.write(struct.pack('ccccII',
+                                         bytes(tempstr[0].encode()),
+                                         bytes(tempstr[1].encode()),
+                                         bytes(tempstr[2].encode()),
+                                         bytes(tempstr[3].encode()),
+                                         data.isotope_Z[i],
+                                         data.isotope_A[i]))
 
             # Write remainder of data
             ntime = data.yld.shape[1]

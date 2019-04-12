@@ -54,7 +54,7 @@ def read_integrated_yield(model_name, output_dir=None, fmt=None,
           produced up to that time; for unstable isotopes, this
           includes the effects of decay since production
     """
-
+    
     # Open file
     fp, fname = slug_open(model_name+"_integrated_yield", 
                           output_dir=output_dir,
@@ -189,6 +189,9 @@ def read_integrated_yield(model_name, output_dir=None, fmt=None,
             if np.amin(time[:idx] == time[idx:2*idx]):
                 time = time[:idx]
             yld = yld.reshape((len(trial)//idx, time.size,
+                               isotope_name.size))
+        else:
+            yld = yld.reshape((1, time.size,
                                isotope_name.size))
 
     elif fname.endswith('.fits'):
