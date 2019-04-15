@@ -207,7 +207,7 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
   // Read the tracks
   if (pp.query<int>("verbosity") > 1)
     ostreams.slug_out_one << "reading tracks" << std::endl;
-  switch (static_cast<trackSet>(pp.query<int>("track_set"))) {
+  switch (static_cast<trackSet>(pp.query<int>("tracks"))) {
   case NO_TRACK_SET: {
     // User has manually specified the file name; decide if it is a
     // starburst99 or MIST file based on its extension; note that
@@ -247,7 +247,7 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
   case PADOVA_TPAGB_NO: {
     // These are starburst99 track sets
     tracks = (slug_tracks *)
-      new slug_tracks_sb99(static_cast<trackSet>(pp.query<int>("track_set")),
+      new slug_tracks_sb99(static_cast<trackSet>(pp.query<int>("tracks")),
 			   pp.query<double>("metallicity"),
 			   pp.fpath("track_dir"), ostreams);
     break;
@@ -257,7 +257,7 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
   case MIST_2016_VVCRIT_40: {
     // These are MIST track sets
     tracks = (slug_tracks *)
-      new slug_tracks_mist(static_cast<trackSet>(pp.query<int>("track_set")),
+      new slug_tracks_mist(static_cast<trackSet>(pp.query<int>("tracks")),
 			   pp.query<double>("metallicity"),
 			   pp.fpath("track_dir"), ostreams);
     break;
@@ -420,7 +420,7 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
   
   // If using nebular emission, initialize the computation of that
   if (pp.query<int>("compute_nebular")) {
-    if (pp.query<int>("track_set") == NO_TRACK_SET) {
+    if (pp.query<int>("tracks") == NO_TRACK_SET) {
       // User has manually specified a file name
       nebular = new slug_nebular(pp.fpath("atomic_data"),
 				 specsyn->lambda(true),

@@ -213,7 +213,7 @@ slug_parmParser::setDefaults() {
   keywords["imf"] = (p / path("imf") / path("chabrier.imf")).string();
   keywords["cmf"] = (p / path("cmf") / path("slug_default.cmf")).string();
   keywords["clf"] = (p / path("clf") / path("slug_default.clf")).string();
-  keywords["track_set"] = GENEVA_2013_VVCRIT_00;
+  keywords["tracks"] = GENEVA_2013_VVCRIT_00;
   keywords["track_dir"] = (p / path("tracks")).string();
   keywords["atmospheres"] = (p / path("atmospheres")).string();
   keywords["specsyn_mode"] = SB99;
@@ -401,24 +401,24 @@ slug_parmParser::parseFile(std::ifstream &paramFile) {
 	string track_val = tokens[1];
 	to_lower(track_val);
 	if (!track_val.compare("geneva_2013_vvcrit_00")) {
-	  keywords["track_set"] = GENEVA_2013_VVCRIT_00;
+	  keywords["tracks"] = GENEVA_2013_VVCRIT_00;
 	} else if (!track_val.compare("geneva_2013_vvcrit_40")) {
-	  keywords["track_set"] = GENEVA_2013_VVCRIT_40;
+	  keywords["tracks"] = GENEVA_2013_VVCRIT_40;
 	} else if (!track_val.compare("geneva_mdot_std")) {
-	  keywords["track_set"] = GENEVA_MDOT_STD;
+	  keywords["tracks"] = GENEVA_MDOT_STD;
 	} else if (!track_val.compare("geneva_mdot_enhanced")) {
-	  keywords["track_set"] = GENEVA_MDOT_ENHANCED;
+	  keywords["tracks"] = GENEVA_MDOT_ENHANCED;
 	} else if (!track_val.compare("padova_tpagb_yes")) {
-	  keywords["track_set"] = PADOVA_TPAGB_YES;
+	  keywords["tracks"] = PADOVA_TPAGB_YES;
 	} else if (!track_val.compare("padova_tpagb_no")) {
-	  keywords["track_set"] = PADOVA_TPAGB_NO;
+	  keywords["tracks"] = PADOVA_TPAGB_NO;
 	} else if (!track_val.compare("mist_2016_vvcrit_00")) {
-	  keywords["track_set"] = MIST_2016_VVCRIT_00;
+	  keywords["tracks"] = MIST_2016_VVCRIT_00;
 	} else if (!track_val.compare("mist_2016_vvcrit_40")) {
-	  keywords["track_set"] = MIST_2016_VVCRIT_40;
+	  keywords["tracks"] = MIST_2016_VVCRIT_40;
 	} else {
 	  // Track is not a special value, so interpret as a file name
-	  keywords["track_set"] = NO_TRACK_SET;
+	  keywords["tracks"] = NO_TRACK_SET;
 	  filepaths["tracks"] = path(tokens[1]);
 	}
 	
@@ -745,7 +745,7 @@ slug_parmParser::checkParams() {
   }
 
   // Make sure we have a valid, non-contradictory metallicity
-  if (query<int>("track_set") == NO_TRACK_SET &&
+  if (query<int>("tracks") == NO_TRACK_SET &&
       query<double>("metallicity") != -constants::big) {
     ostreams.slug_warn_one << "metallicity set but tracks specified "
 			   << "by file name; metallicity will be set "
@@ -1170,7 +1170,7 @@ slug_parmParser::writeParams() const {
     paramFile << "cluster_mass         " << query<double>("cluster_mass")
 	      << endl;
   paramFile << "CLF                  " << fpath("clf") << endl;
-  switch (static_cast<trackSet>(query<int>("track_set"))) {
+  switch (static_cast<trackSet>(query<int>("tracks"))) {
   case NO_TRACK_SET: {
     paramFile << "tracks               " << fpath("tracks") << endl;
     break;
