@@ -630,7 +630,9 @@ slug_parmParser::parseFile(std::ifstream &paramFile) {
   if (keywords.find("constant_sfr") == keywords.end())
     keywords["constant_sfr"] = true;
   if (keywords.find("random_sfr") == keywords.end())
-    keywords["random_sfr"] = false;  
+    keywords["random_sfr"] = false;
+  if (keywords.find("use_extinct") == keywords.end())
+    keywords["use_extinct"] = false;
 
   // Initialise file paths from keywords
   filepaths["rng_seed_file"] = path(query<string>("rng_seed_file"));
@@ -1243,12 +1245,14 @@ slug_parmParser::writeParams() const {
     break;
   }
   }
-  if (!query<int>("constant_A_V")) {
-    paramFile << "A_V                  " << fpath("A_V") << endl;
-    paramFile << "extinction_curve     " << fpath("extinction_curve") << endl;
-  } else if (query<int>("use_extinct")) {
-    paramFile << "A_V                  " << query<double>("A_V") << endl;
-    paramFile << "extinction_curve     " << fpath("extinction_curve") << endl;
+  if (query<int>("use_extinct")) {
+    if (!query<int>("constant_A_V")) {
+      paramFile << "A_V                  " << fpath("A_V") << endl;
+      paramFile << "extinction_curve     " << fpath("extinction_curve") << endl;
+    } else {
+      paramFile << "A_V                  " << query<double>("A_V") << endl;
+      paramFile << "extinction_curve     " << fpath("extinction_curve") << endl;
+    }
   }
   if (query<int>("compute_nebular")) {
     paramFile << "nebular_emission     " << "yes" << endl;
