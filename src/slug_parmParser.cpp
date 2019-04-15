@@ -556,7 +556,9 @@ slug_parmParser::parseFile(std::ifstream &paramFile) {
 	nTokExpected = 1;
 
 	// For this key type, we don't know in advance how many
-	// entries there will be, so parse them one at a time
+	// entries there will be, so parse them one at a time; store
+	// them in a temporary vector, then copy them when we're done
+	vector<double> t;
 	for (vector<string>::size_type tokPtr = 1;
 	     tokPtr < tokens.size(); tokPtr++) {
 
@@ -570,16 +572,15 @@ slug_parmParser::parseFile(std::ifstream &paramFile) {
 	  split(tokTmp, tokens[tokPtr], is_any_of(", "),
 		token_compress_on);
 
-	  // Construct vector of doubles to store
-	  vector<double> tokDbl;
+	  // Store in temporary vector
 	  for (vector<string>::size_type i = 0; i < tokTmp.size(); i++) {
 	    if (tokTmp[i].length() == 0) continue;
-	    tokDbl.push_back(lexical_cast<double>(tokTmp[i]));
+	    t.push_back(lexical_cast<double>(tokTmp[i]));
 	  }
-
-	  // Store in keyword
-	  it->second = tokDbl;
 	}
+
+	// Store final result
+	it->second = t;
 
       } else if (vector<string> *val =
 		 boost::get<vector<string> >(&(it->second))) {
@@ -588,7 +589,9 @@ slug_parmParser::parseFile(std::ifstream &paramFile) {
 	nTokExpected = 1;
 
 	// For this key type, we don't know in advance how many
-	// entries there will be, so parse them one at a time
+	// entries there will be, so parse them one at a time; store
+	// them in a temporary vector, then copy them when we're done
+	vector<string> t;
 	for (vector<string>::size_type tokPtr = 1;
 	     tokPtr < tokens.size(); tokPtr++) {
 
@@ -602,10 +605,15 @@ slug_parmParser::parseFile(std::ifstream &paramFile) {
 	  split(tokTmp, tokens[tokPtr], is_any_of(", "),
 		token_compress_on);
 
-	  // Store in keyword
-	  it->second = tokTmp;
+	  // Store in temporary vector
+	  for (vector<string>::size_type i = 0; i < tokTmp.size(); i++) {
+	    if (tokTmp[i].length() == 0) continue;
+	    t.push_back(tokTmp[i]);
+	  }
 	}
 
+	// Store final result
+	it->second = t;
       }
       
     } catch (const bad_lexical_cast& ia) {
