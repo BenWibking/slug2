@@ -130,7 +130,6 @@ for dirname in dirs:
                  fdat[:,cols.index('surface_c13')]
         n_surf = fdat[:,cols.index('surface_n14')]
         o_surf = fdat[:,cols.index('surface_o16')]
-        vwind = fdat[:,cols.index('v_wind_Km_per_s')]
         phase = np.array(fdat[:,cols.index('phase')], dtype=int)
 
         # Store file data
@@ -147,7 +146,6 @@ for dirname in dirs:
             'age' : t,
             'mass' : m,
             'mdot' : mdot,
-            'v_wind' : vwind,
             'log_L' : log_L,
             'log_Teff' : log_Teff,
             'h_surf' : h_surf,
@@ -163,7 +161,7 @@ for dirname in dirs:
     # Find maximum number of points in any file, and pad shorter data
     # to that length
     npts_max = np.amax([d['n_pts'] for d in data])
-    flds = ['age', 'mass', 'mdot', 'v_wind', 'log_L', 'log_Teff',
+    flds = ['age', 'mass', 'mdot', 'log_L', 'log_Teff',
             'h_surf', 'he_surf', 'c_surf', 'n_surf', 'o_surf']
     for d in data:
         if d['n_pts'] < npts_max:
