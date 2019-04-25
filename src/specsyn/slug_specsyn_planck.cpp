@@ -170,13 +170,13 @@ get_spectrum(const slug_stardata& stardata) const {
     pow(10.0, 2.0*(stardata.logR+constants::logRsun));
   double Teff = pow(10.0, stardata.logTeff);
 
-  // Add 4 pi R^2 B_lambda(T), in units of erg/s/Angstrom
+  // Add 4 pi R^2 (pi B_lambda(T)), in units of erg/s/Angstrom
   for (unsigned int j=0; j<lambda_rest.size(); j++) {
     double lcgs = lambda_rest[j] * constants::Angstrom;
     double x = constants::hcOverkB / (lcgs * Teff);
     double b_lambda = 2.0 * constants::hc2 /
       (pow(lcgs, 5.0) * (exp(x) - 1));
-    L_lambda[j] = surf_area * b_lambda * constants::Angstrom;
+    L_lambda[j] = surf_area * M_PI * b_lambda * constants::Angstrom;
   }
 
   // Return
