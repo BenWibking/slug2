@@ -428,7 +428,7 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
 				 ostreams,
 				 pp.query<double>("nebular_den"),
 				 pp.query<double>("nebular_temp"),
-				 pp.query<double>("nebular_logU"),
+				 pp.query<double>("nebular_logu"),
 				 pp.query<double>("nebular_phi"),
 				 pp.query<double>("redshift"),
 				 pp.query<int>("nebular_no_metals"));
@@ -444,7 +444,7 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
 			   ostreams,
 			   pp.query<double>("nebular_den"),
 			   pp.query<double>("nebular_temp"),
-			   pp.query<double>("nebular_logU"),
+			   pp.query<double>("nebular_logu"),
 			   pp.query<double>("nebular_phi"),
 			   pp.query<double>("redshift"),
 			   pp.query<int>("nebular_no_metals"));

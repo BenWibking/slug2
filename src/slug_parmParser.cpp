@@ -1270,7 +1270,7 @@ slug_parmParser::writeParams() const {
 	      << endl;
     paramFile << "nebular_phi          " << query<double>("nebular_phi")
 	      << endl;
-    paramFile << "nebular_logU         " << query<double>("nebular_logU")
+    paramFile << "nebular_logU         " << query<double>("nebular_logu")
 	      << endl;
     paramFile << "nebular_no_metals    " << query<int>("nebular_no_metals")
 	      << endl;
