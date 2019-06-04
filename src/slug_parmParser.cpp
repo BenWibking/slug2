@@ -233,7 +233,7 @@ slug_parmParser::setDefaults() {
   keywords["nebular_no_metals"] = 0;
   keywords["nebular_den"] = 1.0e2;
   keywords["nebular_temp"] = -1.0;
-  keywords["nebular_logU"] = -3.0;
+  keywords["nebular_logu"] = -3.0;
   keywords["nebular_phi"] = 0.73;
 
   // Photometric filter keywords
