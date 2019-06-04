@@ -3,9 +3,15 @@ This script provides a menu-driven interface to write out slug
 parameter files.
 """
 
+import sys
 import curses
 import curses.textpad
-from curses.wrapper import wrapper
+if sys.version_info[0] < 3:
+    # Python 2 version
+    from curses.wrapper import wrapper
+else:
+    # Python 3 version
+    from curses import wrapper
 import os.path as osp
 from collections import OrderedDict
 import textwrap
@@ -45,8 +51,10 @@ class Menu(object):
         # Store stdscr
         self.stdscr = stdscr
 
-        # Get the window size
+        # Get the window size; make sure it is large enough
         self.winy, self.winx = self.stdscr.getmaxyx()
+        if self.winy < 27 or self.winx < 80:
+            raise RuntimeError("Terminal must be at least 80 x 27")
 
         # Set up the text wrapper utility class
         self.wrapper = textwrap.TextWrapper(
@@ -156,6 +164,12 @@ class Menu(object):
                 ItemType.Bool, only_if = [('sim_type', 'galaxy')],
                 help_txt = 'if true, write out photometric ' +
                 'properties of galaxy as a whole')),
+            ('out_integrated_sn', Menu_opt(
+                'Write integrated SN numbers', True,
+                'Output', ItemType.Bool,
+                only_if = [('sim_type', 'galaxy')],
+                help_txt = 'if true, write out number of SNe in ' +
+                'galaxy as a whole')),
             ('out_integrated_spec', Menu_opt(
                 'Write integrated spectra', True,
                 'Output', ItemType.Bool,
@@ -178,6 +192,11 @@ class Menu(object):
                 'Output', ItemType.Bool,
                 help_txt = 'if true, write out photometric ' +
                 'properties of each star cluster')),
+            ('out_cluster_sn', Menu_opt(
+                'Write cluster SN numbers', True,
+                'Output', ItemType.Bool,
+                help_txt = 'if true, write out number of SN in '+
+                'eacsh cluster')),
             ('out_cluster_spec', Menu_opt(
                 'Write cluster spectra', True,
                 'Output', ItemType.Bool,
@@ -495,6 +514,9 @@ class Menu(object):
             else:
                 com = self.stdscr.instr(
                     int(self.offset*self.winx)-1).strip()
+                if sys.version_info[0] > 2:
+                    # Deal with python 3 string bullshit
+                    com = com.decode('ascii')
                 if com == 'Exit without writing':
                     self.done = True
                 elif com == 'Write and exit':
@@ -818,7 +840,7 @@ class Menu(object):
         # Draw a border and a title
         self.stdscr.border()
         titstr = 'SLUG2 Parameter File Writer'
-        self.stdscr.addnstr(1, self.winx/2-len(titstr)/2, 
+        self.stdscr.addnstr(1, int(self.winx/2-len(titstr)/2), 
                             titstr, len(titstr))
 
         # Record which lines contain options and which contain commands
