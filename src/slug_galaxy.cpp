@@ -326,8 +326,10 @@ slug_galaxy::advance(double time) {
   while (field_stars.size() > 0) {
     if (field_stars.back().death_time < time) {
       fieldRemnantMass += tracks->remnant_mass(field_stars.back().mass);
-      if (yields->produces_sn(field_stars.back().mass)) {
-	field_stoch_sn++;
+      if (yields) {
+	if (yields->produces_sn(field_stars.back().mass)) {
+	  field_stoch_sn++;
+	}
       }
       dead_field_stars.push_back(field_stars.back());
       field_stars.pop_back();
@@ -407,17 +409,19 @@ slug_galaxy::advance(double time) {
   // integral using the functionality for integration over the IMF
   // rather than that for integration over IMF and star formation
   // history.
-  field_tot_sn = field_stoch_sn;
-  if (imf->get_xStochMin() > imf->get_xMin()) {
-    vector<double> sn_mass_range = yields->sn_mass_range();
-    for (vector<double>::size_type i=0; i<=sn_mass_range.size(); i+=2) {
-      double mlo = min(sn_mass_range[i], imf->get_xStochMin());
-      double mhi = min(sn_mass_range[i+1], imf->get_xMax());
-      if (mhi > mlo) {
-	field_tot_sn +=
-	  integ.integrate_nt_lim(1.0, time, mlo, mhi,
-				 boost::bind(galaxy::dnSN_dm, _1, _2,
-					     sfh, tracks));
+  if (yields) {
+    field_tot_sn = field_stoch_sn;
+    if (imf->get_xStochMin() > imf->get_xMin()) {
+      vector<double> sn_mass_range = yields->sn_mass_range();
+      for (vector<double>::size_type i=0; i<=sn_mass_range.size(); i+=2) {
+	double mlo = min(sn_mass_range[i], imf->get_xStochMin());
+	double mhi = min(sn_mass_range[i+1], imf->get_xMax());
+	if (mhi > mlo) {
+	  field_tot_sn +=
+	    integ.integrate_nt_lim(1.0, time, mlo, mhi,
+				   boost::bind(galaxy::dnSN_dm, _1, _2,
+					       sfh, tracks));
+	}
       }
     }
   }
