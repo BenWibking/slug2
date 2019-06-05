@@ -681,10 +681,12 @@ slug_galaxy::set_spectrum(const bool del_cluster) {
   // field stars get extincted by the expectation value of the AV
   // distribution, and their nebular emission gets extincted by the
   // expectation value of the nebular A_V distribution.
-  if (imf->has_stoch_lim()) {
+  if (imf->has_stoch_lim() && fc != 1.0) {
     double Lbol_tmp;
     vector<double> spec;
     specsyn->get_spectrum_cts_sfh(curTime, spec, Lbol_tmp);
+    for (vector<double>::size_type i=0; i<nl; i++)
+      spec[i] *= (1.0-fc);
     for (vector<double>::size_type i=0; i<nl; i++) 
       L_lambda[i] += spec[i];
     Lbol += Lbol_tmp;
