@@ -416,6 +416,8 @@ slug_parmParser::parseFile(std::ifstream &paramFile) {
 	  keywords["tracks"] = MIST_2016_VVCRIT_00;
 	} else if (!track_val.compare("mist_2016_vvcrit_40")) {
 	  keywords["tracks"] = MIST_2016_VVCRIT_40;
+	} else if (!track_val.compare("parsec_v1.2")) {
+	  keywords["tracks"] = PARSEC_V1_2;
 	} else {
 	  // Track is not a special value, so interpret as a file name
 	  keywords["tracks"] = NO_TRACK_SET;
@@ -1215,6 +1217,10 @@ slug_parmParser::writeParams() const {
   }
   case MIST_2016_VVCRIT_40: {
     paramFile << "tracks               mist_2016_vvcrit_40" << endl;
+    break;
+  }
+  case PARSEC_V1_2: {
+    paramFile << "tracks               parsec_v1.2" << endl;
     break;
   }
   }

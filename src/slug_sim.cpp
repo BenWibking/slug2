@@ -31,6 +31,7 @@ namespace std
 #include "specsyn/slug_specsyn_planck.H"
 #include "specsyn/slug_specsyn_sb99.H"
 #include "specsyn/slug_specsyn_sb99hruv.H"
+#include "tracks/slug_tracks_parsec.H"
 #include "tracks/slug_tracks_mist.H"
 #include "tracks/slug_tracks_sb99.H"
 #include "yields/slug_yields_multiple.H"
@@ -260,6 +261,13 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
       new slug_tracks_mist(static_cast<trackSet>(pp.query<int>("tracks")),
 			   pp.query<double>("metallicity"),
 			   pp.fpath("track_dir"), ostreams);
+    break;
+  }
+  case PARSEC_V1_2: {
+    // PARSEC tracks
+    tracks = (slug_tracks *)
+      new slug_tracks_parsec(pp.query<double>("metallicity"),
+			     pp.fpath("track_dir"), ostreams);
     break;
   }
 #endif
