@@ -32,9 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define _slug_tracks_mist_H_
 
 #include <cstdio>
-#include "slug_tracks_2d.H"
+#include "slug_tracks_slime.H"
 
-class slug_tracks_mist : public slug_tracks_2d {
+class slug_tracks_mist : public slug_tracks_slime {
 
 public:
 
@@ -61,38 +61,6 @@ public:
 			   spl_arr_view_1d& isochrone_,
 			   acc_arr_view_1d& isochrone_acc_,
 			   slug_stardata& star) const;
-
-  
-protected:
-
-  // Number of properties in these tracks, and indices of variables
-  static const boost::multi_array_types::size_type nprop = 10,
-    idx_h_surf = 4,
-    idx_he_surf = 5,
-    idx_c_surf = 6,
-    idx_n_surf = 7,
-    idx_o_surf = 8,
-    idx_phase = 9;
-
-  // Names of columns in the FITS file that go with each property;
-  // initialized in the cpp file
-  static const char* const fits_colnames[];
-
-private:
-
-  // Method to read the header of a track file; this just extracts the
-  // list of initial masses and time points in contains, then closes
-  // the file
-  void read_trackfile_header(const char *fname,
-			     array1d& logm,
-			     boost::multi_array_types::size_type& ntime);
-
-  // Method to read a track file; templated so that it can accept
-  // either arrays or array views -- S must be a 2D arraylike object,
-  // and T must be a 3D arraylike object, and both must be the correct
-  // shape at the time they are passed to this routine
-  template<typename S, typename T>
-  void read_trackfile(const char *fname, S& logt, T& trackdata);
 
 };
 
