@@ -3,6 +3,7 @@ This function writes out cluster line luminosities computed by cloudy
 from a slug run.
 """
 
+import sys
 from collections import namedtuple
 import numpy as np
 try:
@@ -85,13 +86,18 @@ def write_cluster_cloudylines(data, model_name, fmt):
         # Write out number of lines and line labels as ASCII, one per
         # line
         nlabel = len(data.cloudy_linelist)
-        fp.write(str(nlabel)+"\n")
-        for i in range(nlabel):
-            fp.write(data.cloudy_linelist[i]+"\n")
+        if sys.version_info < (3,):
+            fp.write(str(nlabel)+"\n")
+            for i in range(nlabel):
+                fp.write(data.cloudy_linelist[i]+"\n")
+        else:
+            fp.write(bytes(str(nlabel)+"\n", "ascii"))
+            for i in range(nlabel):
+                fp.write(bytes(
+                    data.cloudy_linelist[i]+"\n", "ascii"))
 
         # Write line wavelengths
         fp.write(data.cloudy_linewl)
-
 
         # Break data into blocks of clusters with the same time
         # and trial number

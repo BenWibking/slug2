@@ -3,6 +3,7 @@ This function writes out photometry computed on a cloudy output
 nebular spectrum for a series of star clusters.
 """
 
+import sys
 import numpy as np
 try:
     import astropy.io.fits as fits
@@ -98,10 +99,17 @@ def write_cluster_cloudyphot(data, model_name, fmt):
 
         # Write number of filters and filter names as ASCII
         nf = len(data.cloudy_filter_names)
-        fp.write(str(nf)+"\n")
-        for i in range(nf):
-            fp.write(data.cloudy_filter_names[i] + " " + 
-                     data.cloudy_filter_units[i] + "\n")
+        if sys.version_info < (3,):
+            fp.write(str(nf)+"\n")
+            for i in range(nf):
+                fp.write(data.cloudy_filter_names[i] + " " + 
+                         data.cloudy_filter_units[i] + "\n")
+        else:
+            fp.write(bytes(str(nf)+"\n", "ascii"))
+            for i in range(nf):
+                fp.write(bytes(
+                    data.cloudy_filter_names[i] + " " + 
+                    data.cloudy_filter_units[i] + "\n", "ascii"))
 
         # Break data into blocks of clusters with the same time
         # and trial number
