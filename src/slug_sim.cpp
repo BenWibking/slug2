@@ -3305,7 +3305,7 @@ void slug_sim::open_integrated_yield(slug_output_files &outfiles,
     vector<long> isotope_Z(isotopes.size());
     vector<long> isotope_A(isotopes.size());
     for (vector<long>::size_type i=0; i<isotopes.size(); i++) {
-      isotope_names[i] = new char[3];
+      isotope_names[i] = new char[4];
       sprintf(isotope_names[i], "%3s", isotopes[i]->symbol().c_str());
       isotope_Z[i] = isotopes[i]->num();
       isotope_A[i] = isotopes[i]->wgt();
@@ -3510,7 +3510,7 @@ void slug_sim::open_cluster_yield(slug_output_files &outfiles,
     vector<long> isotope_Z(isotopes.size());
     vector<long> isotope_A(isotopes.size());
     for (vector<long>::size_type i=0; i<isotopes.size(); i++) {
-      isotope_names[i] = new char[3];
+      isotope_names[i] = new char[4];
       sprintf(isotope_names[i], "%3s", isotopes[i]->symbol().c_str());
       isotope_Z[i] = isotopes[i]->num();
       isotope_A[i] = isotopes[i]->wgt();
