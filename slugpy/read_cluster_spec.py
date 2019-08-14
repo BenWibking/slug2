@@ -149,7 +149,7 @@ def read_cluster_spec(model_name, output_dir=None, fmt=None,
         trialptr = 0
         entry = fp.readline()
         data = entry.split()
-        cluster_id.append(long(data[0]))
+        cluster_id.append(int(data[0]))
         time.append(float(data[1]))
         wavelength.append(float(data[2]))
         L_lambda.append(float(data[3]))
@@ -177,7 +177,7 @@ def read_cluster_spec(model_name, output_dir=None, fmt=None,
             # Split up data
             data = entry.split()
             L_lambda.append(float(data[3]))
-            id_tmp = long(data[0])
+            id_tmp = int(data[0])
             time_tmp = float(data[1])
             if nebular:
                 L_lambda_neb.append(float(data[4]))
@@ -225,7 +225,7 @@ def read_cluster_spec(model_name, output_dir=None, fmt=None,
             # When we get to the end of a chunk, push cluster ID,
             # time, trial number list, then reset pointer
             if ptr == nl:
-                cluster_id.append(long(data[0]))
+                cluster_id.append(int(data[0]))
                 time.append(float(data[1]))
                 trial.append(trialptr)
                 ptr = 0

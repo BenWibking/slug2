@@ -155,7 +155,7 @@ def read_cluster_cloudyphot(model_name, output_dir=None, fmt=None,
                 trialptr = trialptr+1
                 continue
             linesplit = line.split()
-            cluster_id.append(long(linesplit[0]))
+            cluster_id.append(int(linesplit[0]))
             time.append(float(linesplit[1]))
             phot_trans.append(linesplit[2::3])
             phot_emit.append(linesplit[3::3])

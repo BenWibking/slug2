@@ -89,7 +89,7 @@ def read_cluster_cloudylines(model_name, output_dir=None, fmt=None,
         # Read first line and store cluster data
         trialptr = 0
         entry = fp.readline()
-        cluster_id.append(long(entry[0:11]))
+        cluster_id.append(int(entry[0:11]))
         time.append(float(entry[14:25]))
         label.append(entry[35:39])
         wl.append(float(entry[42:53]))
@@ -108,7 +108,7 @@ def read_cluster_cloudylines(model_name, output_dir=None, fmt=None,
                 break
 
             # Get id, time, luminosity
-            id_tmp = long(entry[0:11])
+            id_tmp = int(entry[0:11])
             time_tmp = float(entry[14:25])
             lum.append(float(entry[56:67]))
 
@@ -144,7 +144,7 @@ def read_cluster_cloudylines(model_name, output_dir=None, fmt=None,
             # When we get to the end of a chunk, push cluster ID,
             # time, trial number list, then reset pointer
             if ptr == nl:
-                cluster_id.append(long(entry[0:11]))
+                cluster_id.append(int(entry[0:11]))
                 time.append(float(entry[14:25]))
                 trial.append(trialptr)
                 ptr = 0

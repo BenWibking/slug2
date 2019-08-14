@@ -150,7 +150,7 @@ def read_cluster_cloudyparams(model_name, output_dir=None, fmt=None,
                 trialptr = trialptr+1
                 continue
             linesplit = line.split()
-            cluster_id.append(long(linesplit[0]))
+            cluster_id.append(int(linesplit[0]))
             time.append(float(linesplit[1]))
             hden.append(float(linesplit[2]))
             r0.append(float(linesplit[3]))

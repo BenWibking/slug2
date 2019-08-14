@@ -100,7 +100,7 @@ def read_cluster_cloudyspec(model_name, output_dir=None, fmt=None,
         trialptr = 0
         entry = fp.readline()
         data = entry.split()
-        cluster_id.append(long(data[0]))
+        cluster_id.append(int(data[0]))
         time.append(float(data[1]))
         wavelength.append(float(data[2]))
         inc.append(float(data[3]))
@@ -122,7 +122,7 @@ def read_cluster_cloudyspec(model_name, output_dir=None, fmt=None,
 
             # Split up data
             data = entry.split()
-            id_tmp = long(data[0])
+            id_tmp = int(data[0])
             time_tmp = float(data[1])
             inc.append(float(data[3]))
             trans.append(float(data[4]))
@@ -163,7 +163,7 @@ def read_cluster_cloudyspec(model_name, output_dir=None, fmt=None,
             # When we get to the end of a chunk, push cluster ID,
             # time, trial number list, then reset pointer
             if ptr == nl:
-                cluster_id.append(long(data[0]))
+                cluster_id.append(int(data[0]))
                 time.append(float(data[1]))
                 trial.append(trialptr)
                 ptr = 0
