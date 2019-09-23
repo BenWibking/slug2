@@ -363,18 +363,32 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
   } else {
     if (pp.query<int>("constant_sfr")) {
       // SFR is constant, so create a powerlaw segment of slope 0 with
-      // the correct normalization
+      // the correct normalization; note that if random output times
+      // has been requested, we need to get the maximum possible time
+      // from that, rather than from the output times list
+      double tmax;
+      if (pp.query<vector<double> >("output_times").size() > 0)
+	tmax = outTimes.back();
+      else
+	tmax = out_time_pdf->get_xMax();
       slug_PDF_powerlaw *sfh_segment = 
-	new slug_PDF_powerlaw(0.0, outTimes.back(), 0.0, rng, ostreams);
+	new slug_PDF_powerlaw(0.0, tmax, 0.0, rng, ostreams);
       sfh = new slug_PDF(sfh_segment, rng, ostreams,
 			 outTimes.back()*pp.query<double>("sfr"));
       sfr_pdf = nullptr;
     } else if (pp.query<int>("random_sfr")) {
       // SFR is to be drawn from a PDF, so read the PDF, and
-      // initialize the SFH from it
+      // initialize the SFH from it; note taht we need to know the
+      // maximum output time, which we take from the input list of
+      // output times, or from the PDF of output times as appropriate
       sfr_pdf = new slug_PDF(pp.fpath("sfr"), rng, ostreams, false);
+      double tmax;
+      if (pp.query<vector<double> >("output_times").size() > 0)
+	tmax = outTimes.back();
+      else
+	tmax = out_time_pdf->get_xMax();
       slug_PDF_powerlaw *sfh_segment = 
-	new slug_PDF_powerlaw(0.0, outTimes.back(), 0.0, rng, ostreams);
+	new slug_PDF_powerlaw(0.0, tmax, 0.0, rng, ostreams);
       sfh = new slug_PDF(sfh_segment, rng, ostreams,
 			 outTimes.back()*sfr_pdf->draw());
     } else {
