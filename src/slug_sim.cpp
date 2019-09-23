@@ -374,7 +374,7 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
       slug_PDF_powerlaw *sfh_segment = 
 	new slug_PDF_powerlaw(0.0, tmax, 0.0, rng, ostreams);
       sfh = new slug_PDF(sfh_segment, rng, ostreams,
-			 outTimes.back()*pp.query<double>("sfr"));
+			 tmax*pp.query<double>("sfr"));
       sfr_pdf = nullptr;
     } else if (pp.query<int>("random_sfr")) {
       // SFR is to be drawn from a PDF, so read the PDF, and
@@ -390,7 +390,7 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
       slug_PDF_powerlaw *sfh_segment = 
 	new slug_PDF_powerlaw(0.0, tmax, 0.0, rng, ostreams);
       sfh = new slug_PDF(sfh_segment, rng, ostreams,
-			 outTimes.back()*sfr_pdf->draw());
+			 tmax*sfr_pdf->draw());
     } else {
       // SFR is not constant, so read SFH from file
       sfh = new slug_PDF(pp.fpath("sfh"), rng, ostreams, false);
