@@ -194,17 +194,19 @@ def write_integrated_cloudyparams(data, model_name, fmt):
         trial = np.transpose(np.tile(
             np.arange(ntrial, dtype='int64'), (ntimes,1))).\
             flatten()
-        if len(data.time) > ntimes:
-            times = data.time
-        else:
-            times = np.tile(data.time, ntrial)
+        #if len(data.time) > ntimes:
+        #    times = data.time
+        #else:
+        #    times = np.tile(data.time, ntrial)
 
         # Convert data to FITS columns
         cols = []
         cols.append(fits.Column(name="Trial", format="1K",
                                 unit="", array=trial))
         cols.append(fits.Column(name="Time", format="1D",
-                                unit="yr", array=times))
+                                unit="yr",
+                                #array=times)
+                                array=np.transpose(data.time).flatten()))
         cols.append(fits.Column(name="HDen", format="1D",
                                 unit="cm^-3",
                                 array=np.transpose(data.cloudy_hden).
