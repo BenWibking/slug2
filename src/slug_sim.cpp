@@ -367,7 +367,7 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
       // has been requested, we need to get the maximum possible time
       // from that, rather than from the output times list
       double tmax;
-      if (pp.query<vector<double> >("output_times").size() > 0)
+      if (outTimes.size() > 0)
 	tmax = outTimes.back();
       else
 	tmax = out_time_pdf->get_xMax();
@@ -383,7 +383,7 @@ slug_sim::slug_sim(const slug_parmParser& pp_, slug_ostreams &ostreams_
       // output times, or from the PDF of output times as appropriate
       sfr_pdf = new slug_PDF(pp.fpath("sfr"), rng, ostreams, false);
       double tmax;
-      if (pp.query<vector<double> >("output_times").size() > 0)
+      if (outTimes.size() > 0)
 	tmax = outTimes.back();
       else
 	tmax = out_time_pdf->get_xMax();
