@@ -1202,7 +1202,9 @@ if compute_continuum:
     else:
         for i in range(len(cloudywl)):
             for j in range(len(cloudywl[0])):
-                if cloudywl[i][j].shape[0] > cloudywl_max.shape[0]:
+                if cloudywl[i][j] is None:
+                    continue # skipped trials
+                elif cloudywl[i][j].shape[0] > cloudywl_max.shape[0]:
                     cloudywl_max = cloudywl[i][j]
 
     # Now loop over stored spectra, padding array beginnings
@@ -1303,6 +1305,21 @@ if compute_lines:
                      osp.basename(args.slug_model_name)),
             file_info['format'])
     else:
+        # Deal with outputs where we have set the luminosity to zero
+        nline = 1
+        for i in range(len(linelum)):
+            for j in range(len(linelum[i])):
+                if linelum[i][j] is not None:
+                    nline = linelum[i][j].shape[0]
+                    break
+            if nline > 1:
+                break
+        for i in range(len(linelum)):
+            for j in range(len(linelum[i])):
+                if linelum[i][j] is None:
+                    linelum[i][j] = np.zeros(nline)
+                    
+        # Write line data
         linelum = np.array(linelum)
         cloudylines_type = namedtuple('cluster_cloudylines',
                                       ['time', 'cloudy_linelabel',
@@ -1369,6 +1386,18 @@ if compute_continuum:
 
     else:
 
+        # Set times / trials we skipped to have photometric values of either
+        # 0 (for non-magnitude systems) or +infinity (for magnitude
+        # systems)
+        nfilter = len(data.filter_names)
+        for i in range(len(cloudyphot)):
+            for j in range(len(cloudyphot[i])):
+                if cloudyphot[i][j] is None:
+                    cloudyphot[i][j] = np.zeros((3,nfilter))
+                    for k in range(nfilter):
+                        if 'mag' in data.filter_units[k]:
+                            cloudyphot[i][j][:,k] = np.inf
+                        
         # Convert to array
         cloudyphot = np.array(cloudyphot)
 
