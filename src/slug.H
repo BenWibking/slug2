@@ -83,6 +83,10 @@ typedef struct {
   double logR;       // Log_10 radius in Rsun
   double logTeff;    // Log_10 Teff in K
   double logg;       // Log_10 g in cm/s^2
+#if 0
+  double Mdot;       // Mass loss rate in Msun/yr
+  double vWind;      // Wind velocity in km/s
+#endif
   WRtype WR;         // Type of WR star
 } slug_stardata;
 

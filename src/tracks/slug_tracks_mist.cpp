@@ -217,6 +217,225 @@ slug_tracks_mist::set_WR_type(const double m,
   }
 }
 
+#if 0
+////////////////////////////////////////////////////////////////////////
+// Methods to set the stellar wind velocity. The models here use the
+// same models used to derive the mass loss rates in MIST for
+// consistency as far as possible, but for some stellar types MIST's
+// mass loss rates are purely empirical fits that make no predictions
+// about velocity. See Roy+ (2019) for a discussion of the various
+// assumptions we make to handle these cases.
+////////////////////////////////////////////////////////////////////////
+void slug_tracks_mist::
+set_wind(const double m, const double t,
+	 const slug_stardata& star) const {
+
+  // Set wind mass loss rate
+  double logm = log(m);
+  double logt = log(t);
+  star.Mdot = pow(10., (*interp)(logt, logm, idx_log_mDot));
+
+  // Get phase and effecitve temperature
+  double phase = (*interp)(logt, logm, idx_phase);
+  double T_eff = pow(10., star.logTeff);
+
+  // Set wind speed based on type of star
+  if (m < 10.0 && phase <= 4.0) {
+
+    // Low mass main sequence stars: we treat these as having a wind
+    // speed equal to the surface escape speed; this is very, very
+    // crude, but, given the very small mass loss rates and power, this
+    // basically doesn't matter
+    star.vWind = 1.0e-5 * sqrt(2.) *
+      pow(10., 0.5 * (constants::logG + constants::logMsun -
+		      constants::logRsun + star.logM - star.logR));
+  
+  } else if ((m < 10.0 && phase > 4.0) ||
+	     (m >= 10.0 && T_eff <= 1.0e4 && star.WR == NONE)) {
+
+    // AGB and RGB stars: MIST uses Reimers (1975) + Blocker (1995),
+    // but these are empirical calibrations that make no
+    // predictions for the wind velocity. We use the Elitzur & Ivezic
+    // (2001, MNRAS, 327, 403) scaling v ~ R_gd^-1/2 L^1/4, where R_gd
+    // = gas to dust ratio. We set the proportionality constant using
+    // the empirical calibration given in Goldman et al. (2017, MNRAS,
+    // 465, 403), which gives v = 9.4 km/s at L = 10^4 Lsun, R_gd =
+    // Milky Way / Solar value. Note that the scaling is not what 
+    // Goldman et al. find empirically, but I'm using the Elitzur 
+    // scaling with the Goldman normalisation by recommendation of
+    // Jacco van Loon. Jacco also notes that the metallicity scaling
+    // almost certainly fails for metal poor stars because their winds
+    // are not dust-driven, but was not able to give me a better 
+    // estimate to use in that case.
+    star.vWind = 9.4 * (pow(10., 0.5*star.logL) - 4.0) /
+      sqrt(metallicity);
+
+  } else if (m >= 10.0 && T_eff > 1.0e4 && star.WR == NONE) {
+
+    // Massive stars
+
+    // Decide what to do based on WR status and T_eff
+    if (T_eff >= 1.1e4 && star.WR == NONE) {
+
+      // O star regime: use the Vink et al. (2000, 2001) scheme
+
+      // Escape speed in km/s
+      double v_esc = 1.0e-5 * sqrt(2.) *
+	pow(10., 0.5 * (constants::logG + constants::logMsun -
+			constants::logRsun + star.logM - star.logR));
+      if (T_eff && T_eff >= 2.75e4) {
+        // Hot regime
+        star.vWind = 2.6 * pow(metallicity, 0.13) * v_esc;
+      } else if (T_eff > 1.1e4 && T_eff < 2.25e4) {
+        // Cold regime
+        star.vWind = 1.3 * pow(metallicity, 0.13) * v_esc;
+      } else if (T_eff < 1.1e4) {
+	// Very cold regime; here we interpolate linearly between the
+	// O star and AGB star cases
+	double vWind_O = 1.3 * pow(metallicity, 0.13) * v_esc;
+	double vWind_AGB = 9.4 * (pow(10., 0.5*star.logL) - 4.0) /
+	  sqrt(metallicity);
+	star.vWind = vWind_O * (T_eff - 1.0e4) / 1.0e3 +
+	  vWind_AGB * (1.1e4 - T_eff) / 1.0e3;
+      } else {
+        // Bistable regime; use equation 15 of Vink+ 2001
+        double logrho = -13.636 + 0.889 * log(metallicity);
+        double T_eff_jump = 6.1e4 + 2.59e3 * logrho;
+        if (T_eff < T_eff_jump)
+          star.vWind = 1.3 * pow(metallicity, 0.13) * v_esc;
+        else
+          star.vWind = 2.6 * pow(metallicity, 0.13) * v_esc;
+      }
+
+    }
+
+  } else if (star.WR != NONE) {
+
+    // Wolf-Rayet star; we set the velocities in these stars by
+    // setting the wind momentum to L/c. While more detailed fits are
+    // given in Nugis & Lamers (2000), which is where the mass loss
+    // rates come from, extrapolating their fits outside the limited
+    // range in metallicities over which Nugis & Lamers had data leads
+    // to nonsense results. Rather than trying to fix up their
+    // formulae, we'll just get something right to within a factor of
+    // ~2, but which will be non-crazy over all parameter regimes.
+    double L = pow(10., star.logL + constants::logLsun);
+    double Mdot = star.Mdot * constants::Msun / constants::yr;
+    star.vWind = L / (Mdot * constants::c) / 1.0e5; // convert to km/s
+
+  }
+
+}
+
+void slug_tracks_mist::
+set_wind(const double m, 
+	 spl_arr_view_1d& isochrone_,
+	 acc_arr_view_1d& isochrone_acc_,
+	 slug_stardata& star) const {
+
+  // Set mass loss rate
+  double logm = log(m);
+  star.mDot =
+    pow(10.0, gsl_spline_eval(isochrone_[idx_log_mDot],
+			      logm,
+			      isochrone_acc_[idx_log_mDot]));
+
+  // Get phase and effecitve temperature
+  double phase = gsl_spline_eval(isochrone_[idx_phase],
+				 logm,
+				 isochrone_acc_[idx_phase]);
+  double T_eff = pow(10., star.logTeff);
+  
+  // Set wind speed based on type of star
+  if (m < 10.0 && phase <= 4.0) {
+
+    // Low mass main sequence stars: we treat these as having a wind
+    // speed equal to the surface escape speed; this is very, very
+    // crude, but, given the very small mass loss rates and power, this
+    // basically doesn't matter
+    star.vWind = 1.0e-5 * sqrt(2.) *
+      pow(10., 0.5 * (constants::logG + constants::logMsun -
+		      constants::logRsun + star.logM - star.logR));
+  
+  } else if ((m < 10.0 && phase > 4.0) ||
+	     (m >= 10.0 && T_eff <= 1.0e4 && star.WR == NONE)) {
+
+    // AGB and RGB stars: MIST uses Reimers (1975) + Blocker (1995),
+    // but these are empirical calibrations that make no
+    // predictions for the wind velocity. We use the Elitzur & Ivezic
+    // (2001, MNRAS, 327, 403) scaling v ~ R_gd^-1/2 L^1/4, where R_gd
+    // = gas to dust ratio. We set the proportionality constant using
+    // the empirical calibration given in Goldman et al. (2017, MNRAS,
+    // 465, 403), which gives v = 9.4 km/s at L = 10^4 Lsun, R_gd =
+    // Milky Way / Solar value. Note that the scaling is not what 
+    // Goldman et al. find empirically, but I'm using the Elitzur 
+    // scaling with the Goldman normalisation by recommendation of
+    // Jacco van Loon. Jacco also notes that the metallicity scaling
+    // almost certainly fails for metal poor stars because their winds
+    // are not dust-driven, but was not able to give me a better 
+    // estimate to use in that case.
+    star.vWind = 9.4 * (pow(10., 0.5*star.logL) - 4.0) /
+      sqrt(metallicity);
+
+  } else if (m >= 10.0 && T_eff > 1.0e4 && star.WR == NONE) {
+
+    // Massive stars
+
+    // Decide what to do based on WR status and T_eff
+    if (T_eff >= 1.1e4 && star.WR == NONE) {
+
+      // O star regime: use the Vink et al. (2000, 2001) scheme
+
+      // Escape speed in km/s
+      double v_esc = 1.0e-5 * sqrt(2.) *
+	pow(10., 0.5 * (constants::logG + constants::logMsun -
+			constants::logRsun + star.logM - star.logR));
+      if (T_eff && T_eff >= 2.75e4) {
+        // Hot regime
+        star.vWind = 2.6 * pow(metallicity, 0.13) * v_esc;
+      } else if (T_eff > 1.1e4 && T_eff < 2.25e4) {
+        // Cold regime
+        star.vWind = 1.3 * pow(metallicity, 0.13) * v_esc;
+      } else if (T_eff < 1.1e4) {
+	// Very cold regime; here we interpolate linearly between the
+	// O star and AGB star cases
+	double vWind_O = 1.3 * pow(metallicity, 0.13) * v_esc;
+	double vWind_AGB = 9.4 * (pow(10., 0.5*star.logL) - 4.0) /
+	  sqrt(metallicity);
+	star.vWind = vWind_O * (T_eff - 1.0e4) / 1.0e3 +
+	  vWind_AGB * (1.1e4 - T_eff) / 1.0e3;
+      } else {
+        // Bistable regime; use equation 15 of Vink+ 2001
+        double logrho = -13.636 + 0.889 * log(metallicity);
+        double T_eff_jump = 6.1e4 + 2.59e3 * logrho;
+        if (T_eff < T_eff_jump)
+          star.vWind = 1.3 * pow(metallicity, 0.13) * v_esc;
+        else
+          star.vWind = 2.6 * pow(metallicity, 0.13) * v_esc;
+      }
+
+    }
+
+  } else if (star.WR != NONE) {
+
+    // Wolf-Rayet star; we set the velocities in these stars by
+    // setting the wind momentum to L/c. While more detailed fits are
+    // given in Nugis & Lamers (2000), which is where the mass loss
+    // rates come from, extrapolating their fits outside the limited
+    // range in metallicities over which Nugis & Lamers had data leads
+    // to nonsense results. Rather than trying to fix up their
+    // formulae, we'll just get something right to within a factor of
+    // ~2, but which will be non-crazy over all parameter regimes.
+    double L = pow(10., star.logL + constants::logLsun);
+    double Mdot = star.Mdot * constants::Msun / constants::yr;
+    star.vWind = L / (Mdot * constants::c) / 1.0e5; // convert to km/s
+
+  }
+  
+}
+
+#endif
+
 
 #endif
 // ENABLE_FITS

@@ -149,6 +149,17 @@ public:
 			   acc_arr_view_1d& isochrone_acc_,
 			   slug_stardata& star) const = 0;
 
+#if 0
+  // Method to set stellar wind properties; this is a pure virtual
+  // that must be implemented in a derived class
+  virtual void set_wind(const double m, const double t,
+			 slug_stardata& star) const = 0;
+  virtual void set_wind(const double m,
+			 spl_arr_view_1d& isochrone_,
+			 acc_arr_view_1d& isochrone_acc_,
+			 slug_stardata& star) const = 0;
+#endif
+
   // Methods to get the metallicity (normalized to Solar)
   virtual double get_metallicity() const { return metallicity; }
 
