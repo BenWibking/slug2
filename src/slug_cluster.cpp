@@ -43,8 +43,16 @@ namespace cluster {
 	       const vector<double>::size_type i) {
     return yields->yield(m, i);
   }
+#ifdef WINDS_ON
+  double star_mDot(const slug_stardata &data) { return data.mDot; }
+  double star_pDot(const slug_stardata &data) {
+    return data.mDot * data.vWind;
+  }
+  double star_lum(const slug_stardata &data) {
+    return 0.5 * data.mDot * SQR(data.vWind);
 }
-
+#endif
+}
 ////////////////////////////////////////////////////////////////////////
 // The constructor
 ////////////////////////////////////////////////////////////////////////
@@ -119,6 +127,11 @@ slug_cluster::slug_cluster(const unsigned long id_,
   tot_sn = 0.0;
   stoch_sn = 0;
 
+#ifdef WINDS_ON
+  // Initialize wind information
+  wind_mDot = wind_pDot = wind_lum = 0.0;
+#endif
+
   // Initialize yields
   if (yields) {
     all_yields.resize(yields->get_niso());
@@ -128,6 +141,9 @@ slug_cluster::slug_cluster(const unsigned long id_,
 
   // Initialize status flags for what data has been stored
   spec_set = Lbol_set = data_set = phot_set = yield_set = ew_set = false;
+#ifdef WINDS_ON
+  winds_set = false;
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -162,6 +178,11 @@ slug_cluster::slug_cluster(const slug_cluster_buffer *buf,
   // Pull out the basic data first
   // Doubles
   const double *buf_dbl = (const double *) buf;
+#ifndef WINDS_ON
+  const int n_dbl = 23;
+#else
+  const int n_dbl = 26;
+#endif
   birthMass = buf_dbl[1];
   aliveMass = buf_dbl[2];
   stochBirthMass = buf_dbl[3];
@@ -184,9 +205,14 @@ slug_cluster::slug_cluster(const slug_cluster_buffer *buf,
   Lbol_ext = buf_dbl[20];
   tot_sn = buf_dbl[21];
   last_yield_time = buf_dbl[22];
+#ifdef WINDS_ON
+  wind_mDot = buf_dbl[23];
+  wind_pDot = buf_dbl[24];
+  wind_lum = buf_dbl[25];
+#endif
 
   // Unsigned longs
-  const unsigned long *buf_ul = (const unsigned long *) (buf_dbl+23);
+  const unsigned long *buf_ul = (const unsigned long *) (buf_dbl+n_dbl);
   id = buf_ul[0];
   stoch_sn = buf_ul[1];
 
@@ -194,6 +220,11 @@ slug_cluster::slug_cluster(const slug_cluster_buffer *buf,
   // read, the the storage space and communication cost isn't going to
   // be affected significantly one way or the other
   const bool *buf_bool = (const bool *) (buf_ul+2);
+#ifdef WINDS_ON
+  const int n_bool = 8;
+#else
+  const int n_bool = 7;
+#endif
   is_disrupted = buf_bool[0];
   data_set = buf_bool[1];
   Lbol_set = buf_bool[2];
@@ -201,10 +232,13 @@ slug_cluster::slug_cluster(const slug_cluster_buffer *buf,
   phot_set = buf_bool[4];
   yield_set = buf_bool[5];
   ew_set = buf_bool[6];
-
+#ifdef WINDS_ON
+  winds_set = buf_bool[7];
+#endif
+  
   // Sizes of various vectors
   const vector<double>::size_type *buf_sz =
-    (const vector<double>::size_type *) (buf_bool+7);
+    (const vector<double>::size_type *) (buf_bool+n_bool);
   stars.resize(buf_sz[0]);
   dead_stars.resize(buf_sz[1]);
   L_lambda.resize(buf_sz[2]);
@@ -303,6 +337,11 @@ slug_cluster::slug_cluster(const slug_cluster &obj,
   Lbol_ext = obj.Lbol_ext;
   tot_sn = obj.tot_sn;
   last_yield_time = obj.last_yield_time;
+#ifdef WINDS_ON
+  wind_mDot = obj.wind_mDot;
+  wind_pDot = obj.wind_pDot;
+  wind_lum = obj.wind_lum;
+#endif
   stoch_sn = obj.stoch_sn;
   is_disrupted = obj.is_disrupted;
   data_set = obj.data_set;
@@ -311,7 +350,10 @@ slug_cluster::slug_cluster(const slug_cluster &obj,
   phot_set = obj.phot_set;
   yield_set = obj.yield_set;
   ew_set = obj.ew_set;
-
+#ifdef WINDS_ON
+  winds_set = obj.winds_set;
+#endif
+  
   // Copy vectors
   stars = obj.stars;
   dead_stars = obj.dead_stars;
@@ -336,7 +378,12 @@ slug_cluster::slug_cluster(const slug_cluster &obj,
 size_t
 slug_cluster::buffer_size() const {
   // Add up the storage needed for the buffer
-  size_t bufsize = 23*sizeof(double) + 2*sizeof(unsigned long) +
+#ifdef WINDS_ON
+  const int n_dbl = 26;
+#else
+  const int n_dbl = 23;
+#endif
+  size_t bufsize = n_dbl*sizeof(double) + 2*sizeof(unsigned long) +
     7*sizeof(bool) + 15*sizeof(vector<double>::size_type) +
     sizeof(double) * (stars.size() + dead_stars.size() +
 		      L_lambda.size() + phot.size() +
@@ -367,6 +414,11 @@ slug_cluster::pack_buffer(slug_cluster_buffer *buf) const {
 
   // Doubles
   double *buf_dbl = (double *) buf;
+#ifdef WINDS_ON
+  const int n_dbl = 26;
+#else
+  const int n_dbl = 23;
+#endif
   buf_dbl[0] = targetMass;
   buf_dbl[1] = birthMass;
   buf_dbl[2] = aliveMass;
@@ -390,9 +442,14 @@ slug_cluster::pack_buffer(slug_cluster_buffer *buf) const {
   buf_dbl[20] = Lbol_ext;
   buf_dbl[21] = tot_sn;
   buf_dbl[22] = last_yield_time;
+#ifdef WINDS_ON
+  buf_dbl[23] = wind_mDot;
+  buf_dbl[24] = wind_pDot;
+  buf_dbl[25] = wind_lum;
+#endif
 
   // Unsigned longs
-  unsigned long *buf_ul = (unsigned long *) (buf_dbl+23);
+  unsigned long *buf_ul = (unsigned long *) (buf_dbl+n_dbl);
   buf_ul[0] = id;
   buf_ul[1] = stoch_sn;
 
@@ -400,6 +457,11 @@ slug_cluster::pack_buffer(slug_cluster_buffer *buf) const {
   // to read, and the overall storage space and cost isn't going to be
   // affected in any significant way
   bool *buf_bool = (bool *) (buf_ul+2);
+#ifdef WINDS_ON
+  const int n_bool = 8;
+#else
+  const int n_bool = 7;
+#endif
   buf_bool[0] = is_disrupted;
   buf_bool[1] = data_set;
   buf_bool[2] = Lbol_set;
@@ -407,10 +469,13 @@ slug_cluster::pack_buffer(slug_cluster_buffer *buf) const {
   buf_bool[4] = phot_set;
   buf_bool[5] = yield_set;
   buf_bool[6] = ew_set;
-
+#ifdef WINDS_ON
+  buf_bool[7] = winds_set;
+#endif
+  
   // Sizes of the various vectors
   vector<double>::size_type *buf_sz =
-    (vector<double>::size_type *) (buf_bool+7);
+    (vector<double>::size_type *) (buf_bool+n_bool);
   buf_sz[0] = stars.size();
   buf_sz[1] = dead_stars.size();
   buf_sz[2] = L_lambda.size();
@@ -487,6 +552,9 @@ slug_cluster::reset(bool keep_id) {
   curTime = last_yield_time = 0.0;
   is_disrupted = false;
   data_set = Lbol_set = spec_set = phot_set = yield_set = ew_set =  false;
+#ifdef WINDS_ON
+  winds_set = false;
+#endif
 
   // Delete current stellar masses and data
   stars.resize(0);
@@ -534,6 +602,11 @@ slug_cluster::reset(bool keep_id) {
   // Reset supernova counts
   tot_sn = 0.0;
   stoch_sn = 0;
+
+#ifdef WINDS_ON
+  // Reset wind quantities
+  wind_mDot = wind_pDot = wind_lum = 0.0;
+#endif
 
   // Reset yields
   all_yields.assign(all_yields.size(), 0.0);
@@ -688,6 +761,9 @@ slug_cluster::advance(double time) {
 
   // Mark that data are not current
   data_set = spec_set = Lbol_set = phot_set = yield_set = ew_set = false;
+#ifdef WINDS_ON
+  winds_set = false;
+#endif
 
   // Update all the stellar data to the new isochrone
   set_isochrone();
@@ -1335,6 +1411,50 @@ void slug_cluster::set_yield() {
   // Record that yields are now current
   yield_set = true;
 }
+
+#ifdef WINDS_ON
+////////////////////////////////////////////////////////////////////////
+// Routine to compute winds at this time
+////////////////////////////////////////////////////////////////////////
+void slug_cluster::set_winds() {
+  
+  // Do nothing if already set
+  if (winds_set) return;
+
+  // Initialize
+  wind_mDot = wind_pDot = wind_lum = 0.0;
+
+  // Stochastic stars part
+  if (stars.size() > 0) {
+
+    // Refresh the stellar data
+    set_isochrone();
+
+    // Add contribution from stochastic stars
+    for (unsigned int i=0; i<stardata.size(); i++) {
+      wind_mDot += stardata[i].mDot;
+      wind_pDot += stardata[i].mDot * stardata[i].vWind;
+      wind_lum += 0.5 * (stardata[i].mDot*constants::Msun) *
+	SQR(stardata[i].vWind*1e5) / constants::Lsun;
+    }
+  }
+
+  // Non-stochastic part
+  if (imf->has_stoch_lim() && !stoch_contrib_only) {
+    wind_mDot += integ.integrate(targetMass, curTime-formationTime,
+				 boost::bind(cluster::star_mDot, _1));
+    wind_pDot += integ.integrate(targetMass, curTime-formationTime,
+				 boost::bind(cluster::star_pdot, _1));
+    wind_lum += integ.integrate(targetMass, curTime-formationTime,
+				 boost::bind(cluster::star_lum, _1)) *
+      constants::Msun*1e10 / constants::Lsun;
+  }
+
+  // Flag that things are set
+  winds_set = true;
+
+}
+#endif
 
 ////////////////////////////////////////////////////////////////////////
 // Routines to return the spectrum, without or without nebular

@@ -217,7 +217,7 @@ slug_tracks_mist::set_WR_type(const double m,
   }
 }
 
-#if 0
+#ifdef WINDS_ON
 ////////////////////////////////////////////////////////////////////////
 // Methods to set the stellar wind velocity. The models here use the
 // same models used to derive the mass loss rates in MIST for
@@ -228,12 +228,12 @@ slug_tracks_mist::set_WR_type(const double m,
 ////////////////////////////////////////////////////////////////////////
 void slug_tracks_mist::
 set_wind(const double m, const double t,
-	 const slug_stardata& star) const {
+	 slug_stardata& star) const {
 
   // Set wind mass loss rate
   double logm = log(m);
   double logt = log(t);
-  star.Mdot = pow(10., (*interp)(logt, logm, idx_log_mDot));
+  star.mDot = pow(10., (*interp)(logt, logm, idx_log_mDot));
 
   // Get phase and effecitve temperature
   double phase = (*interp)(logt, logm, idx_phase);
@@ -320,8 +320,8 @@ set_wind(const double m, const double t,
     // formulae, we'll just get something right to within a factor of
     // ~2, but which will be non-crazy over all parameter regimes.
     double L = pow(10., star.logL + constants::logLsun);
-    double Mdot = star.Mdot * constants::Msun / constants::yr;
-    star.vWind = L / (Mdot * constants::c) / 1.0e5; // convert to km/s
+    double mDot = star.mDot * constants::Msun / constants::yr;
+    star.vWind = L / (mDot * constants::c) / 1.0e5; // convert to km/s
 
   }
 
@@ -427,8 +427,8 @@ set_wind(const double m,
     // formulae, we'll just get something right to within a factor of
     // ~2, but which will be non-crazy over all parameter regimes.
     double L = pow(10., star.logL + constants::logLsun);
-    double Mdot = star.Mdot * constants::Msun / constants::yr;
-    star.vWind = L / (Mdot * constants::c) / 1.0e5; // convert to km/s
+    double mDot = star.mDot * constants::Msun / constants::yr;
+    star.vWind = L / (mDot * constants::c) / 1.0e5; // convert to km/s
 
   }
   

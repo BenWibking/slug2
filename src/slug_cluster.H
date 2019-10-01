@@ -140,6 +140,13 @@ public:
   double get_non_stoch_sn() const
   { if (nonStochBirthMass > 0) return tot_sn - stoch_sn; else return 0.0; }
 
+#ifdef WINDS_ON
+  // Routines to report on winds
+  double get_wind_mDot() const { set_winds(); return wind_mDot; }
+  double get_wind_pDot() const { set_winds(); return wind_pDot; }
+  double get_wind_lum() const { set_winds(); return wind_lum; }
+#endif
+
   // Routine to return the element yield
   const std::vector<double>& get_yields() 
   { set_yield(); return all_yields; }
@@ -251,13 +258,16 @@ protected:
 private:
 
   // Routines to compute stellar data, bolometric luminosity, spectrum,
-  // equivalent widths
+  // equivalent widths, yields, winds
   void set_isochrone();
   void set_Lbol();
   void set_spectrum();
   void set_photometry();
   void set_yield();
   void set_ew();
+#ifdef WINDS_ON
+  void set_winds();
+#endif
 
   // Invariant data
   const double targetMass;            // Target mass
@@ -269,7 +279,7 @@ private:
   const slug_extinction *extinct;     // Extinction
   const slug_nebular *nebular;        // Nebular
   const slug_yields *yields;          // Yields
-  const slug_line_list  *lines;       // Line list  
+  const slug_line_list *lines;        // Line list  
   const slug_imf_integrator<double> integ; // Integration helper class
 
   // Malleable data
@@ -297,6 +307,11 @@ private:
   double Lbol_ext;                    // Extincted bolometric luminosity
   double tot_sn;                      // Total number of SNe, stochastic and not
   double last_yield_time;             // Last time yields were updated
+#ifdef WINDS_ON
+  double wind_mDot;                   // Total wind mass loss rate
+  double wind_pDot;                   // Total wind momentum flux
+  double wind_lum;                    // Total wind mechanical luminosity
+#endif
   std::vector<double> stars;          // List of stellar masses
   std::vector<double> dead_stars;     // Stars that died this time step
   std::vector<slug_stardata> stardata; // Data on stellar properties
@@ -315,8 +330,12 @@ private:
   bool is_disrupted;                  // Is this cluster disrupted?
   bool data_set, Lbol_set, spec_set,
     phot_set, yield_set, ew_set;      // Status indicators
+#ifdef WINDS_ON
+  bool winds_set;
+#endif
   bool stoch_contrib_only;            // Only include the stochastic
-                                      // contribution to yields and spectra
+                                      // contribution to winds, yields,
+                                      // and spectra
   std::vector<double> recspec_wl;     // WL for rectified spectrum
   std::vector<double> recspec;        // Rectified spectrum
 };
