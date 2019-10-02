@@ -201,6 +201,9 @@ slug_parmParser::setDefaults() {
   keywords["out_cluster_sn"] = 1;
   keywords["out_cluster_yield"] = 1;
   keywords["out_cluster_ew"] = 0;
+#ifdef WINDS_ON
+  keywords["out_cluster_winds"] = 1;
+#endif
   keywords["out_integrated"] = 1;
   keywords["out_integrated_phot"] = 1;
   keywords["out_integrated_spec"] = 1;
@@ -800,6 +803,9 @@ slug_parmParser::checkParams() {
       !query<int>("out_cluster_yield") &&
       !query<int>("out_cluster_sn") &&
       !query<int>("out_cluster_ew") &&
+#ifdef WINDS_ON
+      !query<int>("out_cluster_winds") &&
+#endif
       !query<int>("out_integrated") &&
       !query<int>("out_integrated_phot") &&
       !query<int>("out_integrated_spec") &&
@@ -935,7 +941,11 @@ void slug_parmParser::restartSetup() {
     outtypes.push_back("_cluster_yield");
   if (query<int>("out_cluster_ew"))
     outtypes.push_back("_cluster_ew");
-
+#ifdef WINDS_ON
+  if (query<int>("out_cluster_winds"))
+    outtypes.push_back("_cluster_winds");
+#endif
+  
   // Get parallel rank indicator
   string par_str;
 #ifdef ENABLE_MPI
@@ -1314,6 +1324,10 @@ slug_parmParser::writeParams() const {
 	    << query<int>("out_cluster_yield") << endl;
   paramFile << "out_cluster_ew       "
 	    << query<int>("out_cluster_ew")   << endl;
+#ifdef WINDS_ON
+  paramFile << "out_cluster_winds    "
+	    << query<int>("out_cluster_winds")   << endl;
+#endif
   if (query<int>("sim_type") == galaxy_type) {
     paramFile << "out_integrated       "
 	      << query<int>("out_integrated") << endl;

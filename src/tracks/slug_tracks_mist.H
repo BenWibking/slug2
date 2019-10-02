@@ -66,11 +66,11 @@ public:
   // Method to set stellar wind properties; this is a pure virtual
   // that must be implemented in a derived class
   virtual void set_wind(const double m, const double t,
-			 slug_stardata& star) const;
+			slug_stardata& star) const;
   virtual void set_wind(const double m,
-			 spl_arr_view_1d& isochrone_,
-			 acc_arr_view_1d& isochrone_acc_,
-			 slug_stardata& star) const;
+			spl_arr_view_1d& isochrone_,
+			acc_arr_view_1d& isochrone_acc_,
+			slug_stardata& star) const;
 #endif
   
 };

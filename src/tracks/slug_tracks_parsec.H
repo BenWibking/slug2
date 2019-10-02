@@ -58,6 +58,15 @@ public:
 			   acc_arr_view_1d& isochrone_acc_,
 			   slug_stardata& star) const;
 
+#ifdef WINDS_ON
+  // Method to set wind properties
+  virtual void set_wind(const double m, const double t,
+			slug_stardata& star) const { };
+  virtual void set_wind(const double m,
+			spl_arr_view_1d& isochrone_,
+			acc_arr_view_1d& isochrone_acc_,
+			slug_stardata& star) const { };
+#endif
 };
 
 #endif

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *********************************************************************/
 
 ////////////////////////////////////////////////////////////////////////
-// class slug_tracks_mist
+// class slug_tracks_slime
 //
 // This class holds a set of evolutionary tracks in the format
 // produced by the SLIME (SLug Ingestion of MESA Evolution)

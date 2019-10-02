@@ -233,7 +233,7 @@ set_wind(const double m, const double t,
   // Set wind mass loss rate
   double logm = log(m);
   double logt = log(t);
-  star.mDot = pow(10., (*interp)(logt, logm, idx_log_mDot));
+  star.mDot = exp((*interp)(logt, logm, idx_log_mDot));
 
   // Get phase and effecitve temperature
   double phase = (*interp)(logt, logm, idx_phase);
@@ -336,9 +336,9 @@ set_wind(const double m,
   // Set mass loss rate
   double logm = log(m);
   star.mDot =
-    pow(10.0, gsl_spline_eval(isochrone_[idx_log_mDot],
-			      logm,
-			      isochrone_acc_[idx_log_mDot]));
+    exp(gsl_spline_eval(isochrone_[idx_log_mDot],
+			logm,
+			isochrone_acc_[idx_log_mDot]));
 
   // Get phase and effecitve temperature
   double phase = gsl_spline_eval(isochrone_[idx_phase],
@@ -374,46 +374,39 @@ set_wind(const double m,
     // almost certainly fails for metal poor stars because their winds
     // are not dust-driven, but was not able to give me a better 
     // estimate to use in that case.
-    star.vWind = 9.4 * (pow(10., 0.5*star.logL) - 4.0) /
+    star.vWind = 9.4 * pow(10., (star.logL - 4.0)/4.0) /
       sqrt(metallicity);
 
   } else if (m >= 10.0 && T_eff > 1.0e4 && star.WR == NONE) {
 
-    // Massive stars
+    // O star regime: use the Vink et al. (2000, 2001) scheme
 
-    // Decide what to do based on WR status and T_eff
-    if (T_eff >= 1.1e4 && star.WR == NONE) {
-
-      // O star regime: use the Vink et al. (2000, 2001) scheme
-
-      // Escape speed in km/s
-      double v_esc = 1.0e-5 * sqrt(2.) *
-	pow(10., 0.5 * (constants::logG + constants::logMsun -
-			constants::logRsun + star.logM - star.logR));
-      if (T_eff && T_eff >= 2.75e4) {
-        // Hot regime
-        star.vWind = 2.6 * pow(metallicity, 0.13) * v_esc;
-      } else if (T_eff > 1.1e4 && T_eff < 2.25e4) {
-        // Cold regime
-        star.vWind = 1.3 * pow(metallicity, 0.13) * v_esc;
-      } else if (T_eff < 1.1e4) {
-	// Very cold regime; here we interpolate linearly between the
-	// O star and AGB star cases
-	double vWind_O = 1.3 * pow(metallicity, 0.13) * v_esc;
-	double vWind_AGB = 9.4 * (pow(10., 0.5*star.logL) - 4.0) /
-	  sqrt(metallicity);
-	star.vWind = vWind_O * (T_eff - 1.0e4) / 1.0e3 +
-	  vWind_AGB * (1.1e4 - T_eff) / 1.0e3;
-      } else {
-        // Bistable regime; use equation 15 of Vink+ 2001
-        double logrho = -13.636 + 0.889 * log(metallicity);
-        double T_eff_jump = 6.1e4 + 2.59e3 * logrho;
-        if (T_eff < T_eff_jump)
-          star.vWind = 1.3 * pow(metallicity, 0.13) * v_esc;
-        else
-          star.vWind = 2.6 * pow(metallicity, 0.13) * v_esc;
-      }
-
+    // Escape speed in km/s
+    double v_esc = 1.0e-5 * sqrt(2.) *
+      pow(10., 0.5 * (constants::logG + constants::logMsun -
+		      constants::logRsun + star.logM - star.logR));
+    if (T_eff >= 2.75e4) {
+      // Hot regime
+      star.vWind = 2.6 * pow(metallicity, 0.13) * v_esc;
+    } else if (T_eff >= 2.25e4) {
+      // Bistable regime; use equation 15 of Vink+ 2001
+      double logrho = -13.636 + 0.889 * log(metallicity);
+      double T_eff_jump = 6.1e4 + 2.59e3 * logrho;
+      if (T_eff < T_eff_jump)
+	star.vWind = 1.3 * pow(metallicity, 0.13) * v_esc;
+      else
+	star.vWind = 2.6 * pow(metallicity, 0.13) * v_esc;      
+    } else if (T_eff >= 1.1e4) {
+      // Cold regime
+      star.vWind = 1.3 * pow(metallicity, 0.13) * v_esc;
+    } else {
+      // Very cold regime; here we interpolate linearly between the
+      // O star and AGB star cases
+      double vWind_O = 1.3 * pow(metallicity, 0.13) * v_esc;
+      double vWind_AGB = 9.4 * (pow(10., 0.5*star.logL) - 4.0) /
+	sqrt(metallicity);
+      star.vWind = vWind_O * (T_eff - 1.0e4) / 1.0e3 +
+	vWind_AGB * (1.1e4 - T_eff) / 1.0e3;
     }
 
   } else if (star.WR != NONE) {

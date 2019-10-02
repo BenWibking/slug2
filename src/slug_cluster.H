@@ -142,9 +142,9 @@ public:
 
 #ifdef WINDS_ON
   // Routines to report on winds
-  double get_wind_mDot() const { set_winds(); return wind_mDot; }
-  double get_wind_pDot() const { set_winds(); return wind_pDot; }
-  double get_wind_lum() const { set_winds(); return wind_lum; }
+  double get_wind_mDot() { set_winds(); return wind_mDot; }
+  double get_wind_pDot() { set_winds(); return wind_pDot; }
+  double get_wind_lum() { set_winds(); return wind_lum; }
 #endif
 
   // Routine to return the element yield
@@ -239,7 +239,12 @@ public:
   void write_sn(std::ofstream& outfile, const outputMode out_mode,
 		const unsigned long trial,
 		const bool cluster_only = false);
-
+#ifdef WINDS_ON
+  void write_winds(std::ofstream& outfile, const outputMode out_mode,
+		   const unsigned long trial,
+		   const bool cluster_only = false);
+#endif
+  
 #ifdef ENABLE_FITS
   // These are identical to the previous three routines, but they
   // write to a FITS file instead of an ofstream
@@ -250,6 +255,9 @@ public:
   void write_yield(fitsfile *out_fits, unsigned long trial);
   void write_ew(fitsfile *out_fits, unsigned long trial);
   void write_sn(fitsfile *out_fits, unsigned long trial);
+#ifdef WINDS_ON
+  void write_winds(fitsfile *out_fits, unsigned long trial);
+#endif
 #endif
 
 protected:

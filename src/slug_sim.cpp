@@ -564,6 +564,9 @@ void slug_sim::open_output(slug_output_files &outfiles, int chknum) {
   if (pp.query<int>("out_cluster_yield")) open_cluster_yield(outfiles, chknum);
   if (pp.query<int>("out_cluster_sn")) open_cluster_sn(outfiles, chknum);
   if (pp.query<int>("out_cluster_ew")) open_cluster_ew(outfiles, chknum);
+#ifdef WINDS_ON
+  if (pp.query<int>("out_cluster_winds")) open_cluster_winds(outfiles, chknum);
+#endif
   outfiles.is_open = true;
 }
 
@@ -596,6 +599,10 @@ void slug_sim::close_output(slug_output_files &outfiles,
       open_files.push_back(&(outfiles.cluster_yield_file));
     if (outfiles.cluster_sn_file.is_open())
       open_files.push_back(&(outfiles.cluster_sn_file));
+#ifdef WINDS_ON
+    if (outfiles.cluster_winds_file.is_open())
+      open_files.push_back(&(outfiles.cluster_winds_file));
+#endif
 
     // Fix number of trials in file
     for (vector<std::ifstream>::size_type i=0; i<open_files.size(); i++) {
@@ -632,6 +639,10 @@ void slug_sim::close_output(slug_output_files &outfiles,
     outfiles.int_sn_file.close();
   if (outfiles.cluster_sn_file.is_open())
     outfiles.cluster_sn_file.close();
+#ifdef WINDS_ON
+  if (outfiles.cluster_winds_file.is_open())
+    outfiles.cluster_winds_file.close();
+#endif
 
 #ifdef ENABLE_FITS
   // Reset number of trials for FITS files
@@ -657,6 +668,10 @@ void slug_sim::close_output(slug_output_files &outfiles,
       open_files.push_back(outfiles.cluster_yield_fits);
     if (outfiles.cluster_ew_fits != nullptr)
       open_files.push_back(outfiles.cluster_ew_fits);
+#ifdef WINDS_ON
+    if (outfiles.cluster_winds_fits != nullptr)
+      open_files.push_back(outfiles.cluster_winds_fits);
+#endif
 
     // Fix number of trials in file
     for (vector<std::ifstream>::size_type i=0; i<open_files.size(); i++) {
@@ -693,12 +708,20 @@ void slug_sim::close_output(slug_output_files &outfiles,
       fits_close_file(outfiles.cluster_sn_fits, &fits_status);
     if (outfiles.cluster_ew_fits != nullptr)
       fits_close_file(outfiles.cluster_ew_fits, &fits_status);
+#ifdef WINDS_ON
+    if (outfiles.cluster_winds_fits != nullptr)
+      fits_close_file(outfiles.cluster_winds_fits, &fits_status);
+#endif
     outfiles.int_prop_fits = outfiles.cluster_prop_fits
       = outfiles.int_spec_fits = outfiles.cluster_spec_fits
       = outfiles.int_phot_fits = outfiles.cluster_phot_fits
       = outfiles.int_sn_fits = outfiles.cluster_sn_fits 
       = outfiles.int_yield_fits = outfiles.cluster_yield_fits 
-      = outfiles.cluster_ew_fits = nullptr;
+      = outfiles.cluster_ew_fits
+#ifdef WINDS_ON
+      = outfiles.cluster_winds_fits
+#endif
+      = nullptr;
   }
 #endif
 
@@ -867,6 +890,10 @@ void slug_sim::galaxy_sim() {
 	write_separator(outfiles.cluster_sn_file, 14*4-3);
       if (pp.query<int>("out_cluster_yield"))
 	write_separator(outfiles.cluster_yield_file, 14*6-3);
+#ifdef WINDS_ON
+      if (pp.query<int>("out_cluster_winds"))
+	write_separator(outfiles.cluster_winds_file, 18*5-3);
+#endif
     }
 
     // If the output time is randomly changing, draw a new output time
@@ -887,7 +914,11 @@ void slug_sim::galaxy_sim() {
 
       // Flag if we should delete clusters on this pass
       bool del_cluster = (j==outTimes.size()-1) &&
-	(!pp.query<int>("out_cluster_spec")) && (!pp.query<int>("out_cluster_phot")) &&
+	(!pp.query<int>("out_cluster_spec")) &&
+	(!pp.query<int>("out_cluster_phot")) &&
+#ifdef WINDS_ON
+	(!pp.query<int>("out_cluster_winds")) &&
+#endif
 	(!pp.query<int>("out_cluster_yield"));
 
       // If sufficiently verbose, print status
@@ -981,6 +1012,23 @@ void slug_sim::galaxy_sim() {
 	}
 #endif
       }
+
+#if 0
+      // Write wind mechanical feedback info if requested
+      if (pp.query<int>("out_cluster_winds")) {
+#ifdef ENABLE_FITS
+	if (out_mode != FITS) {
+#endif
+	  galaxy->write_cluster_winds(outfiles.cluster_winds_file, out_mode,
+				   trial_ctr_loc);
+#ifdef ENABLE_FITS
+	} else {
+	  galaxy->write_cluster_winds(outfiles.cluster_winds_fits,
+				      trial_ctr_loc);
+	}
+#endif
+      }
+#endif
 
       // Write spectra if requested
       if (pp.query<int>("out_integrated_spec")) {
@@ -1093,7 +1141,11 @@ void slug_sim::cluster_sim() {
   outfiles.int_prop_fits = outfiles.int_spec_fits = outfiles.int_phot_fits
     = outfiles.int_yield_fits = outfiles.cluster_prop_fits
     = outfiles.cluster_spec_fits = outfiles.cluster_phot_fits
-    = outfiles.cluster_yield_fits = outfiles.cluster_ew_fits= nullptr;
+    = outfiles.cluster_yield_fits = outfiles.cluster_ew_fits
+#ifdef WINDS_ON
+    = outfiles.cluster_winds_fits
+#endif
+    = nullptr;
 #endif
   vector<string>::size_type nphot =
     pp.query<vector<string> >("phot_bands").size();
@@ -1227,6 +1279,10 @@ void slug_sim::cluster_sim() {
 	write_separator(outfiles.cluster_yield_file, 5*14-3);
       if (pp.query<int>("out_cluster_sn"))
 	write_separator(outfiles.cluster_sn_file, 4*14-3);
+#ifdef WINDS_ON
+      if (pp.query<int>("out_cluster_winds"))
+	write_separator(outfiles.cluster_winds_file, 5*18-3);
+#endif
     }
     
     // Loop over time steps
@@ -1326,6 +1382,22 @@ void slug_sim::cluster_sim() {
 	}
 #endif
       }
+
+#ifdef WINDS_ON
+      // Write wind output if requested
+      if (pp.query<int>("out_cluster_winds")) {
+#ifdef ENABLE_FITS
+	if (out_mode != FITS) {
+#endif
+	  cluster->write_winds(outfiles.cluster_winds_file, out_mode,
+			       trial_ctr_loc, true);
+#ifdef ENABLE_FITS
+	} else {
+	  cluster->write_winds(outfiles.cluster_winds_fits, trial_ctr_loc);
+	}
+      }
+#endif
+#endif
     }
   }
 
@@ -2131,7 +2203,8 @@ void slug_sim::open_cluster_spec(slug_output_files &outfiles,
     full_path /= fname;
     string fname_tmp = "!" + full_path.string();
     int fits_status = 0;
-    fits_create_file(&outfiles.cluster_spec_fits, fname_tmp.c_str(), &fits_status);
+    fits_create_file(&outfiles.cluster_spec_fits, fname_tmp.c_str(),
+		     &fits_status);
     if (fits_status) {
       char err_txt[80] = "";
       fits_read_errmsg(err_txt);
@@ -2234,7 +2307,8 @@ void slug_sim::open_cluster_spec(slug_output_files &outfiles,
     if (use_extinct && use_nebular) {
       vector<double> lambda_neb_ext = extinct->lambda_neb();
       vector<double>::size_type nl_neb_ext = lambda_neb_ext.size();
-      outfiles.cluster_spec_file.write((char *) &nl_neb_ext, sizeof nl_neb_ext);
+      outfiles.cluster_spec_file.write((char *) &nl_neb_ext,
+				       sizeof nl_neb_ext);
       outfiles.cluster_spec_file.write((char *) &(lambda_neb_ext[0]),
 			      nl_neb_ext*sizeof(double));
     }
@@ -2334,8 +2408,8 @@ void slug_sim::open_cluster_spec(slug_output_files &outfiles,
       col++;
     }
     if (nebular != nullptr && extinct != nullptr) {
-      fits_write_col(outfiles.cluster_spec_fits, TDOUBLE, col, 1, 1, nl_neb_ext,
-		     lambda_neb_ext.data(), &fits_status);
+      fits_write_col(outfiles.cluster_spec_fits, TDOUBLE, col, 1, 1,
+		     nl_neb_ext, lambda_neb_ext.data(), &fits_status);
       col++;
     }
 
@@ -3195,6 +3269,148 @@ void slug_sim::open_cluster_sn(slug_output_files &outfiles,
   }
 #endif
 }
+
+
+////////////////////////////////////////////////////////////////////////
+// Open cluster winds file and write its header
+////////////////////////////////////////////////////////////////////////
+#ifdef WINDS_ON
+void slug_sim::open_cluster_winds(slug_output_files &outfiles,
+				  int chknum) {
+
+  // Construct file name and path
+  string fname(pp.query<string>("model_name"));
+#if defined(ENABLE_MPI) && !(MPI_VERSION == 1 || MPI_VERSION == 2)
+  if (comm != MPI_COMM_NULL) {
+    ostringstream ss;
+    ss << "_" << setfill('0') << setw(4) << rank;
+    fname += ss.str();
+  }
+#endif
+  if (chknum >= 0) {
+    ostringstream ss;
+    ss << "_chk" << setfill('0') << setw(4) << chknum;
+    fname += ss.str();
+  }
+  fname += "_cluster_winds";
+  path full_path(pp.query<string>("out_dir"));
+  if (out_mode == ASCII) {
+    fname += ".txt";
+    full_path /= fname;
+    outfiles.cluster_winds_file.open(full_path.c_str(), ios::out);
+  } else if (out_mode == BINARY) {
+    fname += ".bin";
+    full_path /= fname;
+    outfiles.cluster_winds_file.open(full_path.c_str(), ios::out | ios::binary);
+  }
+#ifdef ENABLE_FITS
+  else if (out_mode == FITS) {
+    fname += ".fits";
+    full_path /= fname;
+    string fname_tmp = "!" + full_path.string();
+    int fits_status = 0;
+    fits_create_file(&outfiles.cluster_winds_fits, fname_tmp.c_str(),
+		     &fits_status);
+    if (fits_status) {
+      char err_txt[80] = "";
+      fits_read_errmsg(err_txt);
+      ostreams.slug_err
+	<< "unable to open cluster winds file "
+	<< full_path.string()
+	<< "; cfitsio says: " << err_txt << endl;
+      bailout(1);
+    }
+  }
+#endif
+
+  // Make sure file is open
+#ifdef ENABLE_FITS
+  if (out_mode != FITS) {
+#endif
+    if (!outfiles.cluster_winds_file.is_open()) {
+      ostreams.slug_err << "unable to open cluster winds file " 
+			<< full_path.string() << endl;
+      bailout(1);
+    }
+#ifdef ENABLE_FITS
+  }
+#endif
+
+  // Write header
+  if (out_mode == ASCII) {
+    if (chknum >= 0)
+      outfiles.cluster_winds_file << "N_Trials = " << setfill('0')
+				  << setw(18) << 0 << setfill(' ') << endl;
+    outfiles.cluster_winds_file << setw(18) << left << "UniqueID"
+				<< setw(18) << left << "Time"
+				<< setw(18) << left << "mDot"
+				<< setw(18) << left << "pDot"
+				<< setw(18) << left << "LMech"
+				<< endl;
+    outfiles.cluster_winds_file << setw(18) << left << ""
+				<< setw(18) << left << "(yr)"
+				<< setw(18) << left << "(Msun/yr)"
+				<< setw(18) << left << "(Msun/yr*km/s)"
+				<< setw(18) << left << "(Lsun)"
+				<< endl;
+    outfiles.cluster_winds_file << setw(18) << left << "---------------"
+				<< setw(18) << left << "---------------"
+				<< setw(18) << left << "---------------"
+				<< setw(18) << left << "---------------"
+				<< setw(18) << left << "---------------"
+				<< endl;
+
+  } else if (out_mode == BINARY) {
+
+    // State number of trials in this file
+    if (chknum >= 0) {
+      unsigned int ntrial = 0;
+      outfiles.cluster_winds_file.write((char *) &ntrial, sizeof ntrial);
+    }
+
+  }
+#ifdef ENABLE_FITS
+  else if (out_mode == FITS) {
+    // Note: this is pretty awkward -- we have to declare a vector of
+    // string, then cast them to arrays of char *, because the cfitsio
+    // library wants that. Unfortunately this awkwardness is the only
+    // way to avoid lots of compiler warnings.
+    int ncol = 6;
+    vector<string> ttype_str = 
+      { "Trial", "UniqueID", "Time", "mDot", "pDot", "LMech" };
+    vector<string> tform_str = 
+      { "1K", "1K", "1D", "1D", "1D", "1D" };
+    vector<string> tunit_str = 
+      { "", "", "yr", "", "" };
+    char **ttype = new char *[ncol];
+    char **tform = new char *[ncol];
+    char **tunit = new char *[ncol];
+    for (int i=0; i<ncol; i++) {
+      ttype[i] = const_cast<char*>(ttype_str[i].c_str());
+      tform[i] = const_cast<char*>(tform_str[i].c_str());
+      tunit[i] = const_cast<char*>(tunit_str[i].c_str());
+    }
+
+    // Create the table
+    int fits_status = 0;
+    fits_create_tbl(outfiles.cluster_winds_fits, BINARY_TBL, 0, ncol,
+		    ttype, tform, tunit, nullptr, &fits_status);
+    delete [] ttype;
+    delete [] tform;
+    delete [] tunit;
+
+    // Add a keyword stating the expected number of trials if this is
+    // a checkpoint file
+    if (chknum >= 0) {
+      unsigned int ntrials = 0;
+      fits_write_key(outfiles.cluster_winds_fits, TUINT, "N_Trials", 
+		     &ntrials, "Number of trials in file",
+		     &fits_status);
+    }
+  }
+#endif
+}
+#endif
 
 
 ////////////////////////////////////////////////////////////////////////

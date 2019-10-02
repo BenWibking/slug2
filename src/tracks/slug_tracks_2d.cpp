@@ -363,10 +363,6 @@ get_isochrone(const double t, const vector<double> &m,
     if (pow(10.0, star.logM) > m[i]) {
       star.logM = log10(m[i]);
     }
-    //if (m[i] > 8.0)
-    //  cout << "i = " << i
-    //	   << ", m_init = " << m[i]
-    //	   << ", m_cur = " << exp(star.logM) << endl;
 
     // log g
     star.logg = constants::logG + star.logM +
@@ -379,6 +375,11 @@ get_isochrone(const double t, const vector<double> &m,
     acc_arr_view_1d isochrone_acc_view
       = isochrone_acc[indices[ptr/2][range_t(0,interp->shape()[2])]];
     set_WR_type(m[i], isochrone_view, isochrone_acc_view, star);
+
+#ifdef WINDS_ON
+    // Wind properties
+    set_wind(m[i], isochrone_view, isochrone_acc_view, star);
+#endif
 
     // Push onto output list
     stars.push_back(star);

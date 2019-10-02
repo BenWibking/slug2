@@ -48,8 +48,8 @@ namespace cluster {
   double star_pDot(const slug_stardata &data) {
     return data.mDot * data.vWind;
   }
-  double star_lum(const slug_stardata &data) {
-    return 0.5 * data.mDot * SQR(data.vWind);
+  double star_wind_lum(const slug_stardata &data) {
+    return 0.5 * data.mDot * data.vWind*data.vWind;
 }
 #endif
 }
@@ -1435,7 +1435,7 @@ void slug_cluster::set_winds() {
       wind_mDot += stardata[i].mDot;
       wind_pDot += stardata[i].mDot * stardata[i].vWind;
       wind_lum += 0.5 * (stardata[i].mDot*constants::Msun) *
-	SQR(stardata[i].vWind*1e5) / constants::Lsun;
+	(stardata[i].vWind*1e5)*(stardata[i].vWind*1e5) / constants::Lsun;
     }
   }
 
@@ -1444,9 +1444,9 @@ void slug_cluster::set_winds() {
     wind_mDot += integ.integrate(targetMass, curTime-formationTime,
 				 boost::bind(cluster::star_mDot, _1));
     wind_pDot += integ.integrate(targetMass, curTime-formationTime,
-				 boost::bind(cluster::star_pdot, _1));
+				 boost::bind(cluster::star_pDot, _1));
     wind_lum += integ.integrate(targetMass, curTime-formationTime,
-				 boost::bind(cluster::star_lum, _1)) *
+				 boost::bind(cluster::star_wind_lum, _1)) *
       constants::Msun*1e10 / constants::Lsun;
   }
 
@@ -2093,6 +2093,72 @@ write_sn(fitsfile *out_fits, unsigned long trial) {
   fits_write_col(out_fits, TULONG, 5, nrows+1, 1, 1, &tmp, 
 		 &fits_status);
 }
+#endif
+
+
+#ifdef WINDS_ON
+////////////////////////////////////////////////////////////////////////
+// Output winds
+////////////////////////////////////////////////////////////////////////
+void
+slug_cluster::
+write_winds(ofstream& outfile, const outputMode out_mode,
+	    const unsigned long trial,
+	    bool cluster_only) {
+
+  // Make sure information is current
+  if (!winds_set) set_winds();
+
+  if (out_mode == ASCII) {
+    outfile << setprecision(5) << scientific 
+	    << setw(15) << right << id << "   "
+	    << setw(15) << right << curTime << "   "
+	    << setw(15) << right << wind_mDot << "   "
+	    << setw(15) << right << wind_pDot << "   "
+	    << setw(15) << right << wind_lum << endl;
+  } else {
+    if (cluster_only) {
+      outfile.write((char *) &trial, sizeof trial);
+      outfile.write((char *) &curTime, sizeof curTime);
+      vector<double>::size_type n = 1;
+      outfile.write((char *) &n, sizeof n);
+    }
+    outfile.write((char *) &id, sizeof id);
+    outfile.write((char *) &wind_mDot, sizeof wind_mDot);
+    outfile.write((char *) &wind_pDot, sizeof wind_pDot);
+    outfile.write((char *) &wind_lum, sizeof wind_lum);
+  }
+}
+
+
+////////////////////////////////////////////////////////////////////////
+// Output supernova count in FITS mode
+////////////////////////////////////////////////////////////////////////
+#ifdef ENABLE_FITS
+void
+slug_cluster::
+write_winds(fitsfile *out_fits, unsigned long trial) {
+
+  // Get current number of entries
+  int fits_status = 0;
+  long nrows = 0;
+  fits_get_num_rows(out_fits, &nrows, &fits_status);
+
+  // Write data
+  fits_write_col(out_fits, TULONG, 1, nrows+1, 1, 1, &trial, 
+		 &fits_status);
+  fits_write_col(out_fits, TULONG, 2, nrows+1, 1, 1, &id, 
+		 &fits_status);
+  fits_write_col(out_fits, TDOUBLE, 3, nrows+1, 1, 1, &curTime, 
+		 &fits_status);
+  fits_write_col(out_fits, TDOUBLE, 4, nrows+1, 1, 1, &wind_mDot, 
+		 &fits_status);
+  fits_write_col(out_fits, TDOUBLE, 5, nrows+1, 1, 1, &wind_pDot, 
+		 &fits_status);
+  fits_write_col(out_fits, TDOUBLE, 6, nrows+1, 1, 1, &wind_lum, 
+		 &fits_status);
+}
+#endif
 #endif
 
 

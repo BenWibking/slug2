@@ -43,6 +43,7 @@ extern "C" {
 #   include "fitsio.h"
 }
 #endif
+#include "slug.H"
 
 ////////////////////////////////////////////////////////////////////////
 // class slug_output_files
@@ -80,6 +81,9 @@ public:
   std::ofstream cluster_sn_file;    // Cluster supernovae file
   std::ofstream int_yield_file;     // Integrated yield file
   std::ofstream cluster_yield_file; // Cluster yield file
+#ifdef WINDS_ON
+  std::ofstream cluster_winds_file; // Cluster winds file
+#endif
 #ifdef ENABLE_FITS
   // FITS file versions of the above
   fitsfile *int_prop_fits;
@@ -93,6 +97,9 @@ public:
   fitsfile *int_yield_fits;
   fitsfile *cluster_yield_fits;
   fitsfile *cluster_ew_fits;
+#ifdef WINDS_ON
+  fitsfile *cluster_winds_fits;
+#endif
 #endif
 };
 
