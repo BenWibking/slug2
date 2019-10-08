@@ -99,7 +99,7 @@ slug_PDF_powerlaw::expectationVal(double a, double b) {
   } else if (segSlope == -1.0) {
     return (b1 - a1) / log(b1/a1);
   } else {
-    return (b1 + a1) / 2.0;
+    return a1 * b1 * log(b1/a1) / (b1 - a1);
   }
 }
 
