@@ -49,7 +49,8 @@ namespace cluster {
     return data.mDot * data.vWind;
   }
   double star_wind_lum(const slug_stardata &data) {
-    return 0.5 * data.mDot * data.vWind*data.vWind;
+    return 0.5 * (data.mDot * constants::Msun/constants::yr) *
+      data.vWind*data.vWind*1e10 / constants::Lsun;
 }
 #endif
 }
@@ -1431,10 +1432,10 @@ void slug_cluster::set_winds() {
     set_isochrone();
 
     // Add contribution from stochastic stars
-    for (unsigned int i=0; i<stardata.size(); i++) {
+    for (vector<double>::size_type i=0; i<stardata.size(); i++) {
       wind_mDot += stardata[i].mDot;
       wind_pDot += stardata[i].mDot * stardata[i].vWind;
-      wind_lum += 0.5 * (stardata[i].mDot*constants::Msun) *
+      wind_lum += 0.5 * (stardata[i].mDot*constants::Msun / constants::yr) *
 	(stardata[i].vWind*1e5)*(stardata[i].vWind*1e5) / constants::Lsun;
     }
   }
@@ -1446,8 +1447,7 @@ void slug_cluster::set_winds() {
     wind_pDot += integ.integrate(targetMass, curTime-formationTime,
 				 boost::bind(cluster::star_pDot, _1));
     wind_lum += integ.integrate(targetMass, curTime-formationTime,
-				 boost::bind(cluster::star_wind_lum, _1)) *
-      constants::Msun*1e10 / constants::Lsun;
+				 boost::bind(cluster::star_wind_lum, _1));
   }
 
   // Flag that things are set
@@ -2132,7 +2132,7 @@ write_winds(ofstream& outfile, const outputMode out_mode,
 
 
 ////////////////////////////////////////////////////////////////////////
-// Output supernova count in FITS mode
+// Output winds in FITS mode
 ////////////////////////////////////////////////////////////////////////
 #ifdef ENABLE_FITS
 void
