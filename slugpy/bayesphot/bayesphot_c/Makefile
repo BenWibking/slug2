@@ -20,6 +20,8 @@ else
           include Make.mach.coala
      else ifneq (,$(findstring raijin, $(UNAMEN)))
           include Make.mach.icc-raijin
+     else ifneq (,$(findstring gadi, $(UNAMEN)))
+          include Make.mach.icc-gadi
      else ifeq ($(UNAME), Linux)
           include Make.mach.linux-gnu
      else ifeq ($(UNAME), Darwin)

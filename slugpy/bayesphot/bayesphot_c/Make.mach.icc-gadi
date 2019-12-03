@@ -1,0 +1,30 @@
+# Machine-specific settings for generic gnu-linux
+
+# Default is g++ / gcc compiler
+MACH_CXX          = icpc
+MACH_CC		  = icc
+
+# Flag needed to specify c++11 standard
+MACH_C11FLAG      =
+
+# Flag needed to link off the correct std c++ library
+MACH_CXXLIB       = -lstdc++
+
+# Optimization flags; note that we omit -Wall because
+# g++ issues a ton of warnings about boost when -Wall is enabled
+MACH_CXXOPTFLAGS  = -O2 -fp-model precise -ipo -qopenmp
+MACH_COPTFLAGS	  = $(MACH_CXXOPTFLAGS)
+MACH_LDOPTFLAGS   = -O2 -fp-model precise -ipo -qopenmp
+
+# Debug flags
+MACH_CXXDEBFLAGS  = -g
+MACH_CDEBFLAGS	  = $(MACH_CXXDEBFLAGS)
+MACH_LDDEBFLAGS   = -g
+
+# Flags to compile shared libaries
+LIB_EXTENSION	   = .so
+CLIBFLAGS	   = -fPIC
+DYNLIBFLAG	   = -shared
+
+# By default boost library names under linux do not have tags
+MACH_BOOST_TAG    =
