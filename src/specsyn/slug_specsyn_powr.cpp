@@ -70,7 +70,7 @@ namespace slug_powr {
     if (star1.WR == star2.WR) {
       return (star1.logTeff < star2.logTeff);
     } else {
-      return (star1.WR == WN);
+      return (star1.WR == WNE || star1.WR == WNL);
     }
   }
 }
@@ -484,9 +484,9 @@ get_spectrum_clean(vector<slug_stardata>& stars) const {
   }
 
   // Figure out where the break between WN and WC occurs in the star
-  // list
+  // list; note that WN includes both WNL and WNE
   unsigned int wcptr = 0;
-  while (stars[wcptr].WR == WN) {
+  while (stars[wcptr].WR == WNE || stars[wcptr].WR == WNL) {
     wcptr++;
     if (wcptr == stars.size()) break;
   }
@@ -528,10 +528,7 @@ get_spectrum_clean(vector<slug_stardata>& stars) const {
 
   // Repeat the procedure for the WC stars
   Tptr = 0;
-  ptr2 = wcptr;
-  
-
-  
+  ptr2 = wcptr; 
   while (ptr2 < stars.size()) {
 
     // Move pointer 2 until it hits the next Teff value or the end of
@@ -590,8 +587,9 @@ get_spectrum(const slug_stardata& stardata) const {
   double surf_area = 4.0 * M_PI * 
     pow(10.0, 2.0 * (stardata.logR + constants::logRsun));
 
-  // Is this a WC or WN star?
-  if (stardata.WR == WN) {
+  // Is this a WC or WN star? Note that WN includes WNE and WNL, and
+  // WC also includes WO for this purpose.
+  if (stardata.WR == WNE || stardata.WR == WNL) {
 
     // WN star. Now find the right effective temperature.
     unsigned int Tptr = 0;

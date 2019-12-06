@@ -620,17 +620,28 @@ read_trackfile_tracks(std::ifstream& trackfile, array1d& logm,
 
 	    dummy = line.substr(breaks[11], breaks[12]-breaks[11]);
 	    trim(dummy);
-	    trackdata[j][idx][idx_log_mDot] = lexical_cast<double>(dummy);
+	    // Special case: for some insane reason the lowest mass
+	    // tracks seem to have a mass loss rate given as 0.000,
+	    // which is clearly supposed to be exaclty zero, as
+	    // opposed to 0 in logarithm. Need to check for this
+	    // contingency.
+	    if (!dummy.compare("0.000")) {
+	      trackdata[j][idx][idx_log_mDot] = -30.0;
+	    } else {
+	      trackdata[j][idx][idx_log_mDot] =
+		lexical_cast<double>(dummy) / constants::loge;
+	    }
 
 	  } else if (tracktype.compare("ML") == 0) {
 
 	    dummy = line.substr(breaks[10], breaks[11]-breaks[10]);
 	    trim(dummy);
-	    trackdata[j][idx][idx_log_mDot] = lexical_cast<double>(dummy);
+	    trackdata[j][idx][idx_log_mDot] =
+	      lexical_cast<double>(dummy) / constants::loge;
 
 	  } else {
 	    
-	    trackdata[j][idx][idx_log_mDot] = -30;
+	    trackdata[j][idx][idx_log_mDot] = -30.0;
 	    
 	  }
 	} catch (const bad_lexical_cast& ia) {
@@ -748,18 +759,26 @@ set_WR_type(const double m, const double t, slug_stardata& star) const {
   
   // H fraction > 0.1 ==> WN
   if (H_frac > 0.1) {
-    star.WR = WN;
+    star.WR = WNL;
     return;
   }
 
-  // Check C/N ratio
-  double C_frac = (*interp)(logt, logm, idx_c_surf);
-  double N_frac = (*interp)(logt, logm, idx_n_surf);
-  if (C_frac/(N_frac+constants::small) < 10.0) {
-    star.WR = WN;
+  // Check surface abundances to decide other WR types
+  double He_frac = (*interp)(logt, logm, idx_he_surf) + constants::small;
+  double C_frac = (*interp)(logt, logm, idx_c_surf) + constants::small;
+  double N_frac = (*interp)(logt, logm, idx_n_surf) + constants::small;
+  double O_frac = (*interp)(logt, logm, idx_o_surf) + constants::small;
+  double C_N_ratio = C_frac / N_frac;
+  double CO_He_ratio = (C_frac/12. + O_frac/16.) / (He_frac / 4.);
+  if (C_N_ratio < 10.0) {
+    star.WR = WNE;
+  } else if (CO_He_ratio < 0.5) {
+    star.WR = WC69;
+  } else if (CO_He_ratio < 1.0) {
+    star.WR = WC45;
   } else {
-    star.WR = WC;
-  }  
+    star.WR = WO;
+  }
 }
 
 void
@@ -788,27 +807,158 @@ slug_tracks_sb99::set_WR_type(const double m,
   // Star has passed mass, Teff, H fraction cuts; now check other
   // criteria to see what type of WR star
   
-  // H fraction > 0.1 ==> WN
+  // H fraction > 0.1 ==> WNL
   if (H_frac > 0.1) {
-    star.WR = WN;
+    star.WR = WNL;
     return;
   }
 
-  // Check C/N ratio
-  double C_frac = gsl_spline_eval(isochrone_[idx_c_surf],
-				  logm,
-				  isochrone_acc_[idx_c_surf]);
-  double N_frac = gsl_spline_eval(isochrone_[idx_n_surf],
-				  logm,
-				  isochrone_acc_[idx_n_surf]);
-  if (C_frac/(N_frac+constants::small) < 10.0) {
-    star.WR = WN;
+  // Check surface abundances to decide other WR types
+  double He_frac =
+    gsl_spline_eval(isochrone_[idx_he_surf],
+		    logm,
+		    isochrone_acc_[idx_he_surf]) + constants::small;
+  double C_frac =
+    gsl_spline_eval(isochrone_[idx_c_surf],
+		    logm,
+		    isochrone_acc_[idx_c_surf]) + constants::small;
+  double N_frac =
+    gsl_spline_eval(isochrone_[idx_n_surf],
+		    logm,
+		    isochrone_acc_[idx_n_surf]) + constants::small;
+  double O_frac =
+    gsl_spline_eval(isochrone_[idx_o_surf],
+		    logm,
+		    isochrone_acc_[idx_o_surf]) + constants::small;
+  double C_N_ratio = C_frac / N_frac;
+  double CO_He_ratio = (C_frac/12. + O_frac/16.) / (He_frac / 4.);
+  if (C_N_ratio < 10.0) {
+    star.WR = WNE;
+  } else if (CO_He_ratio < 0.5) {
+    star.WR = WC69;
+  } else if (CO_He_ratio < 1.0) {
+    star.WR = WC45;
   } else {
-    star.WR = WC;
+    star.WR = WO;
   }
 }
 
   
-  
+#ifdef WINDS_ON
+////////////////////////////////////////////////////////////////////////
+// Methods to set the stellar wind velocity. The models here use the
+// mass loss rates tabulated as part of the stellar tracks, plus the
+// fits for wind terminal velocities from Leitherer et al. (1992, ApJ,
+// 401, 596); the implementation here matches the empirical wind model
+// (model 0) of starburst99.
+////////////////////////////////////////////////////////////////////////
+void slug_tracks_sb99::
+set_wind(const double m, const double t,
+	 slug_stardata& star) const {
+
+  // Set wind mass loss rate
+  double logm = log(m);
+  double logt = log(t);
+  star.mDot = exp((*interp)(logt, logm, idx_log_mDot));
+
+  // Wind models depends on effective temperature and mass loss rate
+  const double LBV_mDot = pow(10., -3.5);
+  if (star.logTeff > 3.9 && star.mDot < LBV_mDot) {
+
+    // Normal OB star case; uses empirical fit from Howarth & Prinja
+    // (1989), plus an added metallicity scaling
+    double L = pow(10., star.logL);
+    double M = pow(10., star.logM);
+    double R = pow(10., star.logR);
+    double rp_cor = fmax(1.0 - 2.7e-5*L/M, 1e-10);
+    double vscale = sqrt(3.81e5 * (M/R) * rp_cor);
+    star.vWind = (0.58 + 2.04*star.logR) * vscale * pow(metallicity, 0.13);
+
+  } else if (star.logTeff <= 3.9 && star.mDot < LBV_mDot) {
+
+    // Cool star case, just uses fixed terminal velocity, again with
+    // an added metallicity scaling
+    star.vWind = 30.0 * pow(metallicity, 0.13);
+
+  } else if (star.mDot >= LBV_mDot && star.WR == NONE) {
+
+    // LBV star case, just uses fixed terminal velocty, with added
+    // metallicity scaling
+    star.vWind = 200.0 * pow(metallicity, 0.13);
+
+  } else {
+
+    // Wolf-Rayet case; fixed speed depending on WR type
+    switch (star.WR) {
+    case WNL: { star.vWind = 1650.0; break; }
+    case WNE: { star.vWind = 1900.0; break; }
+    case WC69: { star.vWind = 1800.0; break; }
+    case WC45: { star.vWind = 2800.0; break; }
+    case WO: { star.vWind = 3500.0; break; }
+    case NONE: { } // Never happens due to previous conditions, just
+		   // included here to suppress compiler warnings
+    }
+    star.vWind *= pow(metallicity, 0.13);
+
+  }
+}
+
+
+void slug_tracks_sb99::
+set_wind(const double m, 
+	 spl_arr_view_1d& isochrone_,
+	 acc_arr_view_1d& isochrone_acc_,
+	 slug_stardata& star) const {
+
+  // Set mass loss rate
+  double logm = log(m);
+  star.mDot =
+    exp(gsl_spline_eval(isochrone_[idx_log_mDot],
+			logm,
+			isochrone_acc_[idx_log_mDot]));
+
+  // Wind models depends on effective temperature and mass loss rate
+  const double LBV_mDot = pow(10., -3.5);
+  if (star.logTeff > 3.9 && star.mDot < LBV_mDot) {
+
+    // Normal OB star case; uses empirical fit from Howarth & Prinja
+    // (1989), plus an added metallicity scaling
+    double L = pow(10., star.logL);
+    double M = pow(10., star.logM);
+    double R = pow(10., star.logR);
+    double rp_cor = fmax(1.0 - 2.7e-5*L/M, 1e-10);
+    double vscale = sqrt(3.81e5 * (M/R) * rp_cor);
+    star.vWind = (0.58 + 2.04*star.logR) * vscale * pow(metallicity, 0.13);
+
+  } else if (star.logTeff <= 3.9 && star.mDot < LBV_mDot) {
+
+    // Cool star case, just uses fixed terminal velocity, again with
+    // an added metallicity scaling
+    star.vWind = 30.0 * pow(metallicity, 0.13);
+
+  } else if (star.mDot >= LBV_mDot && star.WR == NONE) {
+
+    // LBV star case, just uses fixed terminal velocty, with added
+    // metallicity scaling
+    star.vWind = 200.0 * pow(metallicity, 0.13);
+
+  } else {
+
+    // Wolf-Rayet case; fixed speed depending on WR type
+    switch (star.WR) {
+    case WNL: { star.vWind = 1650.0; break; }
+    case WNE: { star.vWind = 1900.0; break; }
+    case WC69: { star.vWind = 1800.0; break; }
+    case WC45: { star.vWind = 2800.0; break; }
+    case WO: { star.vWind = 3500.0; break; }
+    case NONE: { } // Never happens due to previous conditions, just
+		   // included here to suppress compiler warnings
+    }
+    star.vWind *= pow(metallicity, 0.13);
+
+  }
+}
+
+#endif
 
 

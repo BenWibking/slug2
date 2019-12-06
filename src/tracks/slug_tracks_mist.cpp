@@ -168,16 +168,24 @@ set_WR_type(const double m, const double t, slug_stardata& star) const {
   // fractions
   double H_frac = (*interp)(logt, logm, idx_h_surf);
   if (H_frac > 0.1) {
-    star.WR = WN;
+    star.WR = WNL;
     return;
   }
-  double C_frac = (*interp)(logt, logm, idx_c_surf);
-  double N_frac = (*interp)(logt, logm, idx_n_surf);
-  if (C_frac/(N_frac+constants::small) < 10.0) {
-    star.WR = WN;
+  double He_frac = (*interp)(logt, logm, idx_he_surf) + constants::small;
+  double C_frac = (*interp)(logt, logm, idx_c_surf) + constants::small;
+  double N_frac = (*interp)(logt, logm, idx_n_surf) + constants::small;
+  double O_frac = (*interp)(logt, logm, idx_o_surf) + constants::small;
+  double C_N_ratio = C_frac / N_frac;
+  double CO_He_ratio = (C_frac/12. + O_frac/16.) / (He_frac / 4.);
+  if (C_N_ratio < 10.0) {
+    star.WR = WNE;
+  } else if (CO_He_ratio < 0.5) {
+    star.WR = WC69;
+  } else if (CO_He_ratio < 1.0) {
+    star.WR = WC45;
   } else {
-    star.WR = WC;
-  }  
+    star.WR = WO;
+  }
 }
 
 void
@@ -201,19 +209,35 @@ slug_tracks_mist::set_WR_type(const double m,
 				  logm,
 				  isochrone_acc_[idx_h_surf]);
   if (H_frac > 0.1) {
-    star.WR = WN;
+    star.WR = WNL;
     return;
   }
-  double C_frac = gsl_spline_eval(isochrone_[idx_c_surf],
-				  logm,
-				  isochrone_acc_[idx_c_surf]);
-  double N_frac = gsl_spline_eval(isochrone_[idx_n_surf],
-				  logm,
-				  isochrone_acc_[idx_n_surf]);
-  if (C_frac/(N_frac+constants::small) < 10.0) {
-    star.WR = WN;
+  double He_frac =
+    gsl_spline_eval(isochrone_[idx_he_surf],
+		    logm,
+		    isochrone_acc_[idx_he_surf]) + constants::small;
+  double C_frac =
+    gsl_spline_eval(isochrone_[idx_c_surf],
+		    logm,
+		    isochrone_acc_[idx_c_surf]) + constants::small;
+  double N_frac =
+    gsl_spline_eval(isochrone_[idx_n_surf],
+		    logm,
+		    isochrone_acc_[idx_n_surf]) + constants::small;
+  double O_frac =
+    gsl_spline_eval(isochrone_[idx_o_surf],
+		    logm,
+		    isochrone_acc_[idx_o_surf]) + constants::small;
+  double C_N_ratio = C_frac / N_frac;
+  double CO_He_ratio = (C_frac/12. + O_frac/16.) / (He_frac / 4.);
+  if (C_N_ratio < 10.0) {
+    star.WR = WNE;
+  } else if (CO_He_ratio < 0.5) {
+    star.WR = WC69;
+  } else if (CO_He_ratio < 1.0) {
+    star.WR = WC45;
   } else {
-    star.WR = WC;
+    star.WR = WO;
   }
 }
 

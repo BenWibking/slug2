@@ -51,7 +51,7 @@ namespace hillier {
     if (star1.WR == star2.WR) {
       return (star1.logTeff < star2.logTeff);
     } else {
-      return (star1.WR == WN);
+      return (star1.WR == WNE || star1.WR == WNL);
     }
   }
 }
@@ -318,9 +318,10 @@ get_spectrum_clean(vector<slug_stardata>& stars) const {
   }
 
   // Figure out where the break between WN and WC occurs in the star
-  // list
+  // list; note that, for this purpose, we treat WNL's and WNE's as
+  // the same
   unsigned int wcptr = 0;
-  while (stars[wcptr].WR == WN) {
+  while (stars[wcptr].WR == WNL || stars[wcptr].WR == WNE) {
     wcptr++;
     if (wcptr == stars.size()) break;
   }
@@ -360,7 +361,8 @@ get_spectrum_clean(vector<slug_stardata>& stars) const {
     Tptr++;
   }
 
-  // Repeat the procedure for the WC stars
+  // Repeat the procedure for the WC stars; for this purpose we also
+  // treat WO's like WC's
   Tptr = 0;
   ptr2 = wcptr;
   while (ptr2 < stars.size()) {
@@ -421,8 +423,9 @@ get_spectrum(const slug_stardata& stardata) const {
   double surf_area = 4.0 * M_PI * 
     pow(10.0, 2.0 * (stardata.logR + constants::logRsun));
 
-  // Is this a WC or WN star?
-  if (stardata.WR == WN) {
+  // Is this a WC or WN star? For this purpose, WN includes both WNE
+  // and WNL, and WC includes both true WC's and WO's
+  if (stardata.WR == WNE || stardata.WR == WNL) {
 
     // WN star. Now find the right effective temperature.
     unsigned int Tptr = 0;

@@ -27,6 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #   include "mpi.h"
 #endif
 
+//#define WINDS_ON
+
 // Declare all slug classes here
 class slug_PDF;
 class slug_PDF_delta;
@@ -60,7 +62,7 @@ class slug_yields_multiple;
 class slug_yields_snii;
 
 // Enum for WR star types
-enum WRtype { NONE, WC, WN };
+enum WRtype { NONE, WNL, WNE, WC69, WC45, WO };
 
 // Enum for output modes
 enum outputMode { ASCII, BINARY
@@ -68,8 +70,6 @@ enum outputMode { ASCII, BINARY
 		  , FITS
 #endif
 };
-
-//#define WINDS_ON
 
 // Struct to represent basic data on stars
 typedef struct { 
