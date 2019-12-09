@@ -179,10 +179,10 @@ slug_cluster::slug_cluster(const slug_cluster_buffer *buf,
   // Pull out the basic data first
   // Doubles
   const double *buf_dbl = (const double *) buf;
-#ifndef WINDS_ON
-  const int n_dbl = 23;
-#else
+#ifdef WINDS_ON
   const int n_dbl = 26;
+#else
+  const int n_dbl = 23;
 #endif
   birthMass = buf_dbl[1];
   aliveMass = buf_dbl[2];
@@ -381,11 +381,13 @@ slug_cluster::buffer_size() const {
   // Add up the storage needed for the buffer
 #ifdef WINDS_ON
   const int n_dbl = 26;
+  const int n_bool = 8;
 #else
   const int n_dbl = 23;
+  const int n_bool = 7;
 #endif
   size_t bufsize = n_dbl*sizeof(double) + 2*sizeof(unsigned long) +
-    7*sizeof(bool) + 15*sizeof(vector<double>::size_type) +
+    n_bool*sizeof(bool) + 15*sizeof(vector<double>::size_type) +
     sizeof(double) * (stars.size() + dead_stars.size() +
 		      L_lambda.size() + phot.size() +
 		      L_lambda_ext.size() + phot_ext.size() +
