@@ -1395,8 +1395,8 @@ void slug_sim::cluster_sim() {
 	} else {
 	  cluster->write_winds(outfiles.cluster_winds_fits, trial_ctr_loc);
 	}
-      }
 #endif
+      }
 #endif
     }
   }

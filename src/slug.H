@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #   include "mpi.h"
 #endif
 
-//#define WINDS_ON
+#define WINDS_ON
 
 // Declare all slug classes here
 class slug_PDF;
