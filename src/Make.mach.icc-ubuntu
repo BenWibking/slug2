@@ -1,0 +1,38 @@
+# Machine-specific settings for NCI raijin with intel compilers
+
+# Set compilers
+MACH_CXX          = icpc
+MACH_CC		  = icc
+MACH_MPICXX       = mpic++
+
+# Flag needed to specify c++11 standard
+MACH_C11FLAG      = #-std=c++14
+
+# Flag needed to link off the correct std c++ library
+MACH_CXXLIB       = -lstdc++
+
+# Optimization flags; note that we omit -Wall because
+# g++ issues a ton of warnings about boost when -Wall is enabled
+ifeq ($(MPI), ENABLE_MPI)
+     MACH_CXXOPTFLAGS  = -O2 -fp-model precise
+     MACH_COPTFLAGS    = $(MACH_CXXOPTFLAGS)
+     MACH_LDOPTFLAGS   = -O2 -fp-model precise
+else
+     MACH_CXXOPTFLAGS  = -O2 -fp-model precise -ipo
+     MACH_COPTFLAGS    = $(MACH_CXXOPTFLAGS)
+     MACH_LDOPTFLAGS   = -O2 -fp-model precise -ipo
+endif
+
+# Debug flags
+MACH_CXXDEBFLAGS  = -g
+MACH_CDEBFLAGS	  = $(MACH_CXXDEBFLAGS)
+MACH_LDDEBFLAGS   = -g
+
+# Flags to compile as a shared or static library
+LIB_EXTENSION	   = .so
+LIBSTAT_EXTENSION  = .a
+CLIBFLAGS	   = -fPIC
+DYNLIBFLAG	   = -shared
+
+# By default boost library names under linux do not have tags
+MACH_BOOST_TAG    = 
